@@ -21,6 +21,8 @@ if (!process.env.JWT_SECRET) {
 }
 connectDB();
 
+const isVercelRuntime = process.env.VERCEL === "1";
+
 const app = express();
 
 app.use(cors());
@@ -46,8 +48,12 @@ app.use("/uploads", express.static(uploadsPath));
 const displayPath = path.join(__dirname, "..", "tablet-web");
 app.use("/display", express.static(displayPath));
 
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-  startDailySummaryScheduler();
-});
+if (!isVercelRuntime) {
+  const PORT = process.env.PORT || 5000;
+  app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+    startDailySummaryScheduler();
+  });
+}
+
+module.exports = app;
