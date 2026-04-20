@@ -1,0 +1,42 @@
+const express = require("express");
+
+const authMiddleware = require("../middleware/auth");
+
+const router = express.Router();
+
+router.post("/device/clock-sync", authMiddleware, (req, res) => {
+  const now = new Date();
+
+  const deviceTimeText = (req.body.deviceTime || "").trim();
+  const protocolVersion = (req.body.protocolVersion || "1.0").trim();
+  const timezoneOffsetMinutes = Number(req.body.timezoneOffsetMinutes ?? 0);
+
+  let offsetMs = null;
+  if (deviceTimeText) {
+    const deviceDate = new Date(deviceTimeText);
+    if (Number.isNaN(deviceDate.getTime())) {
+      return res.status(400).json({
+        success: false,
+        message: "deviceTime must be valid ISO datetime",
+      });
+    }
+    offsetMs = now.getTime() - deviceDate.getTime();
+  }
+
+  return res.json({
+    success: true,
+    message: "Clock sync data generated",
+    data: {
+      protocolVersion,
+      syncedAt: now.toISOString(),
+      serverTime: now.toISOString(),
+      serverEpochMs: now.getTime(),
+      timezoneOffsetMinutes,
+      offsetMs,
+      maxDriftMs: 30000,
+      shouldUpdateClock: offsetMs === null ? false : Math.abs(offsetMs) > 30000,
+    },
+  });
+});
+
+module.exports = router;
