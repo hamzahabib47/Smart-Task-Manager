@@ -15,13 +15,19 @@ const {
 } = require("./services/dailySummaryScheduler");
 
 dotenv.config();
-if (!process.env.JWT_SECRET) {
-  console.error("JWT_SECRET is required in .env");
-  process.exit(1);
-}
-connectDB();
-
 const isVercelRuntime = process.env.VERCEL === "1";
+
+if (!process.env.JWT_SECRET) {
+  const msg = "JWT_SECRET is required";
+  if (isVercelRuntime) {
+    console.error(`${msg} in Vercel Environment Variables`);
+  } else {
+    console.error(`${msg} in .env`);
+    process.exit(1);
+  }
+}
+
+connectDB();
 
 const app = express();
 
