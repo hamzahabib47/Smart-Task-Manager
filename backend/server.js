@@ -48,7 +48,9 @@ app.use("/api", deviceRoutes);
 app.use("/api", alarmRoutes);
 app.use("/api", taskRoutes);
 
-const uploadsPath = path.join(__dirname, "uploads");
+const uploadsPath = isVercelRuntime
+  ? path.join("/tmp", "uploads")
+  : path.join(__dirname, "uploads");
 app.use("/uploads", express.static(uploadsPath));
 
 const displayPath = path.join(__dirname, "..", "tablet-web");

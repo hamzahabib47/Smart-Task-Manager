@@ -8,8 +8,16 @@ const Photo = require("../models/Photo");
 
 const router = express.Router();
 
-const uploadDir = path.join(__dirname, "..", "uploads");
-fs.mkdirSync(uploadDir, { recursive: true });
+const isVercelRuntime = process.env.VERCEL === "1";
+const uploadDir = isVercelRuntime
+  ? path.join("/tmp", "uploads")
+  : path.join(__dirname, "..", "uploads");
+
+try {
+  fs.mkdirSync(uploadDir, { recursive: true });
+} catch (error) {
+  console.error("Failed to initialize upload directory:", error.message);
+}
 
 const storage = multer.diskStorage({
   destination: (_req, _file, cb) => cb(null, uploadDir),
