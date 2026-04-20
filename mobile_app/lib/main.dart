@@ -2368,57 +2368,108 @@ class _TaskScreenState extends State<TaskScreen> {
                             itemCount: visibleTasks.length,
                             itemBuilder: (context, index) {
                               final task = visibleTasks[index];
+                              final timeLine =
+                                  "${task.date} ${formatTimeByPreference(task.time)}";
+                              final description = task.description.trim();
+                              final subtitleText = description.isEmpty
+                                  ? timeLine
+                                  : "$timeLine\n$description";
+
+                              final actionButtons = [
+                                IconButton(
+                                  onPressed: () => editTask(task),
+                                  icon: const Icon(Icons.edit),
+                                  tooltip: "Edit",
+                                ),
+                                IconButton(
+                                  onPressed: task.completed
+                                      ? null
+                                      : () => completeTask(task.id),
+                                  icon: const Icon(Icons.check),
+                                  tooltip: "Complete",
+                                ),
+                                IconButton(
+                                  onPressed: task.archived
+                                      ? null
+                                      : () => archiveTask(task.id),
+                                  icon: const Icon(Icons.archive),
+                                  tooltip: "Archive",
+                                ),
+                                IconButton(
+                                  onPressed: task.completed
+                                      ? null
+                                      : () => dismissTask(task.id),
+                                  icon: const Icon(Icons.notifications_off),
+                                  tooltip: "Dismiss",
+                                ),
+                                IconButton(
+                                  onPressed: () => deleteTask(task.id),
+                                  icon: const Icon(Icons.delete),
+                                  tooltip: "Delete",
+                                ),
+                              ];
+
                               return Card(
-                                child: ListTile(
-                                  title: Text(
-                                    task.title,
-                                    style: TextStyle(
-                                      decoration: task.completed
-                                          ? TextDecoration.lineThrough
-                                          : TextDecoration.none,
-                                    ),
-                                  ),
-                                  subtitle: Text(
-                                      "${task.date} ${formatTimeByPreference(task.time)}\n${task.description}",
-                                  ),
-                                  isThreeLine: true,
-                                  trailing: Wrap(
-                                    spacing: 2,
-                                    children: [
-                                      IconButton(
-                                        onPressed: () => editTask(task),
-                                        icon: const Icon(Icons.edit),
-                                        tooltip: "Edit",
+                                child: LayoutBuilder(
+                                  builder: (context, constraints) {
+                                    final isNarrow = constraints.maxWidth < 560;
+
+                                    if (!isNarrow) {
+                                      return ListTile(
+                                        title: Text(
+                                          task.title,
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                            decoration: task.completed
+                                                ? TextDecoration.lineThrough
+                                                : TextDecoration.none,
+                                          ),
+                                        ),
+                                        subtitle: Text(subtitleText),
+                                        isThreeLine: true,
+                                        trailing: Wrap(
+                                          spacing: 2,
+                                          children: actionButtons,
+                                        ),
+                                      );
+                                    }
+
+                                    return Padding(
+                                      padding: const EdgeInsets.fromLTRB(12, 10, 8, 8),
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            task.title,
+                                            maxLines: 2,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: TextStyle(
+                                              fontWeight: FontWeight.w600,
+                                              decoration: task.completed
+                                                  ? TextDecoration.lineThrough
+                                                  : TextDecoration.none,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            subtitleText,
+                                            maxLines: 4,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                          const SizedBox(height: 6),
+                                          Align(
+                                            alignment: Alignment.centerRight,
+                                            child: Wrap(
+                                              spacing: 2,
+                                              runSpacing: 2,
+                                              children: actionButtons,
+                                            ),
+                                          ),
+                                        ],
                                       ),
-                                      IconButton(
-                                        onPressed: task.completed
-                                            ? null
-                                            : () => completeTask(task.id),
-                                        icon: const Icon(Icons.check),
-                                        tooltip: "Complete",
-                                      ),
-                                      IconButton(
-                                        onPressed: task.archived
-                                            ? null
-                                            : () => archiveTask(task.id),
-                                        icon: const Icon(Icons.archive),
-                                        tooltip: "Archive",
-                                      ),
-                                      IconButton(
-                                        onPressed: task.completed
-                                            ? null
-                                            : () => dismissTask(task.id),
-                                        icon:
-                                            const Icon(Icons.notifications_off),
-                                        tooltip: "Dismiss",
-                                      ),
-                                      IconButton(
-                                        onPressed: () => deleteTask(task.id),
-                                        icon: const Icon(Icons.delete),
-                                        tooltip: "Delete",
-                                      ),
-                                    ],
-                                  ),
+                                    );
+                                  },
                                 ),
                               );
                             },
@@ -2444,54 +2495,55 @@ class _TaskScreenState extends State<TaskScreen> {
               decoration: const InputDecoration(labelText: "Alarm label"),
             ),
             const SizedBox(height: 8),
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: alarmDateController,
-                    readOnly: selectedRecurrence == "daily",
-                    onTap: selectedRecurrence == "daily" ? null : pickAlarmDate,
-                    decoration: const InputDecoration(
-                      labelText: "Alarm date",
-                      suffixIcon: Icon(Icons.calendar_month),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: TextField(
-                    controller: alarmTimeController,
-                    readOnly: true,
-                    onTap: pickAlarmTime,
-                    decoration: const InputDecoration(
-                      labelText: "Alarm time",
-                      suffixIcon: Icon(Icons.schedule),
-                    ),
-                  ),
-                ),
-              ],
+            TextField(
+              controller: alarmDateController,
+              readOnly: selectedRecurrence == "daily",
+              onTap: selectedRecurrence == "daily" ? null : pickAlarmDate,
+              decoration: const InputDecoration(
+                labelText: "Alarm date",
+                suffixIcon: Icon(Icons.calendar_month),
+              ),
             ),
             const SizedBox(height: 8),
-            Row(
+            TextField(
+              controller: alarmTimeController,
+              readOnly: true,
+              onTap: pickAlarmTime,
+              decoration: const InputDecoration(
+                labelText: "Alarm time",
+                suffixIcon: Icon(Icons.schedule),
+              ),
+            ),
+            const SizedBox(height: 8),
+            DropdownButtonFormField<String>(
+              isExpanded: true,
+              initialValue: selectedRecurrence,
+              decoration: const InputDecoration(
+                labelText: "Recurrence",
+              ),
+              items: const [
+                DropdownMenuItem(value: "none", child: Text("One-time")),
+                DropdownMenuItem(value: "daily", child: Text("Daily")),
+              ],
+              onChanged: (value) {
+                if (value == null) return;
+                setState(() => selectedRecurrence = value);
+              },
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              crossAxisAlignment: WrapCrossAlignment.center,
               children: [
-                DropdownButton<String>(
-                  value: selectedRecurrence,
-                  items: const [
-                    DropdownMenuItem(value: "none", child: Text("One-time")),
-                    DropdownMenuItem(value: "daily", child: Text("Daily")),
-                  ],
-                  onChanged: (value) {
-                    if (value == null) return;
-                    setState(() => selectedRecurrence = value);
-                  },
-                ),
-                const SizedBox(width: 8),
                 FilledButton(
                   onPressed: addAlarm,
                   child: const Text("Add Alarm"),
                 ),
-                const SizedBox(width: 8),
-                TextButton(onPressed: fetchAlarms, child: const Text("Refresh")),
+                TextButton(
+                  onPressed: fetchAlarms,
+                  child: const Text("Refresh"),
+                ),
               ],
             ),
             const SizedBox(height: 8),
@@ -2690,56 +2742,74 @@ class _TaskScreenState extends State<TaskScreen> {
                   ],
                 ),
                 const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Expanded(
-                      child: DropdownButtonFormField<String>(
-                        key: ValueKey("time-format-$timeFormat"),
-                        initialValue: timeFormat,
-                        decoration: const InputDecoration(labelText: "Time format"),
-                        items: const [
-                          DropdownMenuItem(
-                            value: "12-hour",
-                            child: Text("12-hour"),
-                          ),
-                          DropdownMenuItem(
-                            value: "24-hour",
-                            child: Text("24-hour"),
-                          ),
-                        ],
-                        onChanged: (v) {
-                          if (v == null) return;
-                          setState(() => timeFormat = v);
-                          saveSettings(showSuccess: false);
-                        },
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: DropdownButtonFormField<String>(
-                        key: ValueKey("reminder-style-$reminderStyle"),
-                        initialValue: reminderStyle,
-                        decoration: const InputDecoration(
-                          labelText: "Reminder style",
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final isNarrow = constraints.maxWidth < 520;
+
+                    final timeFormatField = DropdownButtonFormField<String>(
+                      key: ValueKey("time-format-$timeFormat"),
+                      isExpanded: true,
+                      initialValue: timeFormat,
+                      decoration: const InputDecoration(labelText: "Time format"),
+                      items: const [
+                        DropdownMenuItem(
+                          value: "12-hour",
+                          child: Text("12-hour"),
                         ),
-                        items: const [
-                          DropdownMenuItem(
-                            value: "full_screen",
-                            child: Text("Full screen"),
-                          ),
-                          DropdownMenuItem(
-                            value: "banner",
-                            child: Text("Banner"),
-                          ),
-                        ],
-                        onChanged: (v) {
-                          if (v == null) return;
-                          setState(() => reminderStyle = v);
-                          saveSettings(showSuccess: false);
-                        },
+                        DropdownMenuItem(
+                          value: "24-hour",
+                          child: Text("24-hour"),
+                        ),
+                      ],
+                      onChanged: (v) {
+                        if (v == null) return;
+                        setState(() => timeFormat = v);
+                        saveSettings(showSuccess: false);
+                      },
+                    );
+
+                    final reminderStyleField = DropdownButtonFormField<String>(
+                      key: ValueKey("reminder-style-$reminderStyle"),
+                      isExpanded: true,
+                      initialValue: reminderStyle,
+                      decoration: const InputDecoration(
+                        labelText: "Reminder style",
                       ),
-                    ),
-                  ],
+                      items: const [
+                        DropdownMenuItem(
+                          value: "full_screen",
+                          child: Text("Full screen"),
+                        ),
+                        DropdownMenuItem(
+                          value: "banner",
+                          child: Text("Banner"),
+                        ),
+                      ],
+                      onChanged: (v) {
+                        if (v == null) return;
+                        setState(() => reminderStyle = v);
+                        saveSettings(showSuccess: false);
+                      },
+                    );
+
+                    if (isNarrow) {
+                      return Column(
+                        children: [
+                          timeFormatField,
+                          const SizedBox(height: 8),
+                          reminderStyleField,
+                        ],
+                      );
+                    }
+
+                    return Row(
+                      children: [
+                        Expanded(child: timeFormatField),
+                        const SizedBox(width: 8),
+                        Expanded(child: reminderStyleField),
+                      ],
+                    );
+                  },
                 ),
                 const SizedBox(height: 8),
                 TextField(
