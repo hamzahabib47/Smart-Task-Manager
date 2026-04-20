@@ -1,22 +1,29 @@
-# Smart Time Manager - Smart Display System
+# Smart Time Manager
 
-This project contains 3 parts:
+Smart Time Manager is a multi-client scheduling system with:
 
-1. Backend API (Node.js + Express + MongoDB Atlas)
+1. Backend API (Node.js + Express + MongoDB)
 2. Mobile controller app (Flutter)
-3. Tablet display web page (HTML/CSS/JS polling every 2 seconds)
+3. Display web app (HTML/CSS/JS)
 
-## Folder Structure
+The mobile app controls tasks, alarms, photos, settings, and account actions.
+The display web app shows the live state (slideshow, upcoming task, reminder, alarm).
 
-smart-time-manager/
+## Architecture
+
+Mobile App -> REST API -> MongoDB -> Display Web App
+
+## Project Structure
+
+```
+stm/
   backend/
     config/
-      db.js
+    middleware/
     models/
-      Task.js
     routes/
-      tasks.js
-    .env.example
+    services/
+    uploads/
     package.json
     server.js
   mobile_app/
@@ -27,70 +34,176 @@ smart-time-manager/
     index.html
     styles.css
     app.js
+  README.md
+```
 
-## Data Flow
+Note: The folder is named `tablet-web`, but in product behavior it is the display web app.
 
-Flutter App -> REST API -> MongoDB Atlas -> Tablet Web Page
+## Key Features
 
-## API Endpoints
+### Auth and Account
 
-Base URL: http://YOUR_SERVER_IP:5000/api
+- Register with required name, email, password
+- Sign in with field-specific errors:
+  - incorrect email
+  - incorrect password
+- Change user name from Settings
+- Delete account with strict confirmation text
 
-- POST /tasks
-  - body:
-    {
-      "title": "Meeting with supervisor",
-      "time": "14:30"
-    }
-- GET /tasks
+### Tasks and Alarms
 
-## Quick Start
+- Create, edit, complete, archive, dismiss tasks
+- Create one-time or daily alarms
+- Stop/toggle/delete alarms
+- Time format support (12-hour / 24-hour)
 
-### 1) Backend setup
+### Display Behavior
 
-- Open terminal in backend folder.
-- Install packages:
-  npm install
-- Create .env file from .env.example.
-- Add your MongoDB Atlas URI in MONGODB_URI.
-- Start server:
-  npm run dev
+- Modes: slideshow, single image, upcoming, reminder, alarm
+- Reminder style setting:
+  - full screen
+  - banner
+- Auto close countdown for reminder/alarm
+- Empty image state center message:
+  - "Add Images from mobile app to show on the display"
+- Full image visibility using contain-fit (no crop)
 
-Server starts on http://localhost:5000
+### Mobile Display Tab Preview
 
-### 2) Tablet display setup
+- Mirrors live display behavior and mode content
+- Shows matching primary text, meta info, banner state, and empty-image message
 
-- Open tablet-web/app.js
-- Replace:
-  http://YOUR_SERVER_IP:5000
-  with your computer local IP, for example:
-  http://192.168.1.10:5000
-- On tablet browser open:
-  http://YOUR_SERVER_IP:5000/display/
-- Turn on browser full-screen/kiosk mode.
+## Environment Variables (Backend)
 
-### 3) Flutter mobile app setup
+Create `backend/.env`:
 
-- Open terminal in mobile_app folder.
-- If this is first time in this folder, generate platform folders:
-  flutter create .
-- Get packages:
-  flutter pub get
-- Open lib/main.dart
-- Replace baseUrl value with your backend IP:
-  http://YOUR_SERVER_IP:5000/api
-- Run app:
-  flutter run
+```
+PORT=5000
+MONGODB_URI=your_mongodb_connection_string
+JWT_SECRET=your_long_random_secret
+```
 
-## Kiosk Mode Tip (Android tablet)
+Important:
 
-- Open Chrome and navigate to display URL.
-- Use full-screen mode.
-- For true kiosk lock, use Android screen pinning or any kiosk browser app.
+- Use `MONGODB_URI` (not `MONGO_URI`)
+- `JWT_SECRET` is required or server will exit
 
-## Notes
+## Local Development Setup
 
-- No Firebase used.
-- No WebSockets used.
-- Polling is used every 2 seconds in tablet-web/app.js.
-- Task schema fields: title, time, createdAt.
+### 1) Backend
+
+From workspace root:
+
+```
+npm install --prefix backend
+npm run dev --prefix backend
+```
+
+Server URL:
+
+```
+http://localhost:5000/
+```
+
+### 2) Mobile App
+
+From workspace root:
+
+```
+cd mobile_app
+flutter pub get
+flutter run -d chrome --web-hostname localhost --web-port 8080
+```
+
+Mobile web run URL:
+
+```
+http://localhost:8080
+```
+
+Note: Windows desktop run may fail if Developer Mode/symlink support is disabled.
+
+### 3) Display Web App
+
+The display app is served by backend static route:
+
+```
+http://localhost:5000/display/
+```
+
+## Base URL Rules
+
+### Mobile App
+
+In `mobile_app/lib/main.dart`:
+
+- Must include `/api`
+- Example:
+
+```
+http://localhost:5000/api
+```
+
+### Display Web App
+
+In `tablet-web/app.js`:
+
+- Must not include `/api` in base
+- Example:
+
+```
+http://localhost:5000
+```
+
+The file appends endpoint paths like `/api/tasks/public/display-state` itself.
+
+## Production / Live (Free-Friendly)
+
+Recommended stable free flow:
+
+1. Host backend API (for example Render free)
+2. Keep MongoDB on Atlas free cluster
+3. Host display static app (or use backend `/display` route)
+4. Build Android APK for mobile app and install directly
+5. Use browser fullscreen + screen pinning for kiosk-like display lock
+
+If using free backend hosting, monitor wake-up/cold-start behavior with an uptime monitor.
+
+## Quick Verification Checklist
+
+1. `GET /` returns success JSON
+2. Register and sign in succeed
+3. Settings save succeeds
+4. Display URL opens and updates
+5. Task/alarm transitions render correctly
+6. Reminder style (full screen/banner) reflects as selected
+7. Empty-image message appears only when no display image exists
+
+## Troubleshooting
+
+### Backend does not start
+
+- Check `backend/.env`
+- Ensure `JWT_SECRET` is set
+- Ensure `MONGODB_URI` is valid
+
+### Mobile cannot connect to API
+
+- Confirm mobile base URL has `/api`
+- Confirm backend is running on port 5000
+
+### Display cannot load state
+
+- Confirm `API_BASE_URL` in `tablet-web/app.js` is correct
+- Confirm display URL is opened from backend route `/display/`
+
+### Port conflicts on mobile web
+
+- If port 8080 is busy, stop stale dart/flutter process and re-run
+
+## Tech Stack
+
+- Backend: Node.js, Express, Mongoose, JWT, Multer
+- Mobile: Flutter + HTTP
+- Display: Vanilla HTML/CSS/JS polling model
+- Database: MongoDB
