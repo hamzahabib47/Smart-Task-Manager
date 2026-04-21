@@ -50,6 +50,10 @@ const settingSchema = new mongoose.Schema(
       type: Boolean,
       default: true,
     },
+    timezoneOffsetMinutes: {
+      type: Number,
+      default: 0,
+    },
     archiveCompletedTasks: {
       type: Boolean,
       default: true,

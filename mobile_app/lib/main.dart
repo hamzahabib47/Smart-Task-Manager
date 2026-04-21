@@ -1585,13 +1585,26 @@ class _TaskScreenState extends State<TaskScreen> {
     }
   }
 
+  DateTime? _taskDateTime(Task task) {
+    final date = task.date.trim();
+    final time = task.time.trim();
+    if (date.isEmpty || time.isEmpty) return null;
+    return DateTime.tryParse("${date}T${time}:00");
+  }
+
   List<Task> get visibleTasks {
     if (selectedView == "completed") {
       return tasks.where((task) => task.completed).toList();
     }
 
     if (selectedView == "upcoming") {
-      return tasks.where((task) => !task.completed).toList();
+      final now = DateTime.now();
+      return tasks.where((task) {
+        if (task.completed || task.archived) return false;
+        final scheduled = _taskDateTime(task);
+        if (scheduled == null) return false;
+        return scheduled.isAfter(now) || scheduled.isAtSameMomentAs(now);
+      }).toList();
     }
 
     return tasks;

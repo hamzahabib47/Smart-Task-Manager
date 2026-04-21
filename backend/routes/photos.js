@@ -2,6 +2,7 @@ const fs = require("fs");
 const path = require("path");
 const express = require("express");
 const multer = require("multer");
+const mongoose = require("mongoose");
 
 const authMiddleware = require("../middleware/auth");
 const Photo = require("../models/Photo");
@@ -19,7 +20,10 @@ try {
   console.error("Failed to initialize upload directory:", error.message);
 }
 
-const upload = multer({ storage: multer.memoryStorage() });
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 },
+});
 
 router.get("/photos/public", async (_req, res) => {
   try {
@@ -76,43 +80,65 @@ router.get("/photos/:id/file", async (req, res) => {
 
 router.use("/photos", authMiddleware);
 
-router.post("/photos/upload", upload.single("photo"), async (req, res) => {
-  try {
-    if (!req.file) {
-      return res.status(400).json({
+router.post("/photos/upload", (req, res) => {
+  upload.single("photo")(req, res, async (uploadError) => {
+    try {
+      if (uploadError instanceof multer.MulterError) {
+        if (uploadError.code === "LIMIT_FILE_SIZE") {
+          return res.status(413).json({
+            success: false,
+            message: "Image is too large. Max allowed size is 5MB.",
+          });
+        }
+
+        return res.status(400).json({
+          success: false,
+          message: "Invalid upload request",
+        });
+      }
+
+      if (uploadError) {
+        return res.status(400).json({
+          success: false,
+          message: "Could not process uploaded image",
+        });
+      }
+
+      if (!req.file) {
+        return res.status(400).json({
+          success: false,
+          message: "photo file is required",
+        });
+      }
+
+      const safeName = (req.file.originalname || "photo.jpg").replace(
+        /[^a-zA-Z0-9._-]/g,
+        "_"
+      );
+
+      const photoId = new mongoose.Types.ObjectId();
+      const photo = await Photo.create({
+        _id: photoId,
+        user: req.user.id,
+        filename: `${Date.now()}_${safeName}`,
+        url: `/api/photos/${photoId}/file`,
+        mimeType: req.file.mimetype || "image/jpeg",
+        dataBase64: req.file.buffer.toString("base64"),
+      });
+
+      return res.status(201).json({
+        success: true,
+        message: "Photo uploaded",
+        data: photo,
+      });
+    } catch (error) {
+      return res.status(500).json({
         success: false,
-        message: "photo file is required",
+        message: "Server error",
+        error: error.message,
       });
     }
-
-    const safeName = (req.file.originalname || "photo.jpg").replace(
-      /[^a-zA-Z0-9._-]/g,
-      "_"
-    );
-
-    const photo = await Photo.create({
-      user: req.user.id,
-      filename: `${Date.now()}_${safeName}`,
-      url: "",
-      mimeType: req.file.mimetype || "image/jpeg",
-      dataBase64: req.file.buffer.toString("base64"),
-    });
-
-    photo.url = `/api/photos/${photo._id}/file`;
-    await photo.save();
-
-    return res.status(201).json({
-      success: true,
-      message: "Photo uploaded",
-      data: photo,
-    });
-  } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: "Server error",
-      error: error.message,
-    });
-  }
+  });
 });
 
 router.get("/photos", async (req, res) => {

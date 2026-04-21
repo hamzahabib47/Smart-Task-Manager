@@ -7,11 +7,28 @@ const authMiddleware = require("../middleware/auth");
 
 const router = express.Router();
 
-const parseTaskDateTime = (dateText, timeText) => {
-  const dt = `${dateText || ""}T${timeText || ""}:00`;
-  const parsed = new Date(dt);
+const parseTaskDateTime = (dateText, timeText, timezoneOffsetMinutes = 0) => {
+  const date = (dateText || "").trim();
+  const time = (timeText || "").trim();
+  const dateMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date);
+  const timeMatch = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(time);
+  if (!dateMatch || !timeMatch) return null;
+
+  const year = Number(dateMatch[1]);
+  const month = Number(dateMatch[2]);
+  const day = Number(dateMatch[3]);
+  const hour = Number(timeMatch[1]);
+  const minute = Number(timeMatch[2]);
+
+  const utcMs =
+    Date.UTC(year, month - 1, day, hour, minute, 0) + timezoneOffsetMinutes * 60000;
+  const parsed = new Date(utcMs);
   if (Number.isNaN(parsed.getTime())) return null;
   return parsed;
+};
+
+const localNowByOffset = (nowUtc, timezoneOffsetMinutes = 0) => {
+  return new Date(nowUtc.getTime() - timezoneOffsetMinutes * 60000);
 };
 
 const isSameMinute = (a, b) =>
@@ -22,9 +39,9 @@ const isSameMinute = (a, b) =>
   a.getMinutes() === b.getMinutes();
 
 const localDateText = (d) => {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
+  const y = d.getUTCFullYear();
+  const m = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(d.getUTCDate()).padStart(2, "0");
   return `${y}-${m}-${day}`;
 };
 
@@ -45,18 +62,26 @@ const formatByPreference = (timeText, timeFormat) => {
   return toTwelveHour(timeText);
 };
 
-const shouldTriggerAlarmNow = (alarm, now) => {
-  const scheduledToday = parseTaskDateTime(localDateText(now), alarm.time);
+const shouldTriggerAlarmNow = (alarm, nowUtc, timezoneOffsetMinutes, todayText) => {
+  const scheduledToday = parseTaskDateTime(
+    todayText,
+    alarm.time,
+    timezoneOffsetMinutes
+  );
   if (!scheduledToday) return false;
 
   if (alarm.recurrence === "daily") {
-    return isSameMinute(scheduledToday, now);
+    return isSameMinute(scheduledToday, nowUtc);
   }
 
   if (!alarm.date) return false;
-  const scheduled = parseTaskDateTime(alarm.date, alarm.time);
+  const scheduled = parseTaskDateTime(
+    alarm.date,
+    alarm.time,
+    timezoneOffsetMinutes
+  );
   if (!scheduled) return false;
-  return isSameMinute(scheduled, now);
+  return isSameMinute(scheduled, nowUtc);
 };
 
 router.get("/tasks/public/latest", async (_req, res) => {
@@ -83,10 +108,15 @@ router.get("/tasks/public/display-state", async (_req, res) => {
     const alarmAutoStopSeconds = 30;
     const reminderAutoDismissSeconds = 30;
     const now = new Date();
-    const todayText = localDateText(now);
 
     const latestSetting = await Setting.findOne().sort({ updatedAt: -1 });
     const displayUserId = latestSetting?.user || null;
+    const timezoneOffsetMinutes = Number(latestSetting?.timezoneOffsetMinutes ?? 0);
+    const safeTimezoneOffsetMinutes = Number.isFinite(timezoneOffsetMinutes)
+      ? timezoneOffsetMinutes
+      : 0;
+    const nowLocal = localNowByOffset(now, safeTimezoneOffsetMinutes);
+    const todayText = localDateText(nowLocal);
 
     const dataScope = displayUserId ? { user: displayUserId } : null;
     const tasksQuery = {
@@ -117,6 +147,7 @@ router.get("/tasks/public/display-state", async (_req, res) => {
       buzzerAlerts,
       reminderStyle,
       timeFormat,
+      timezoneOffsetMinutes: safeTimezoneOffsetMinutes,
     };
 
     const photos = await Photo.find(dataScope || {}).sort({ createdAt: -1 }).limit(30);
@@ -157,7 +188,7 @@ router.get("/tasks/public/display-state", async (_req, res) => {
           continue;
         }
 
-        if (!shouldTriggerAlarmNow(alarm, now)) {
+        if (!shouldTriggerAlarmNow(alarm, now, safeTimezoneOffsetMinutes, todayText)) {
           continue;
         }
 
@@ -197,7 +228,11 @@ router.get("/tasks/public/display-state", async (_req, res) => {
 
     const dueNowTask = tasks.find((task) => {
       if (task.dismissed) return false;
-      const scheduled = parseTaskDateTime(task.date, task.time);
+      const scheduled = parseTaskDateTime(
+        task.date,
+        task.time,
+        safeTimezoneOffsetMinutes
+      );
       if (!scheduled) return false;
       return isSameMinute(scheduled, now);
     });
@@ -260,7 +295,11 @@ router.get("/tasks/public/display-state", async (_req, res) => {
 
     const nextTask = tasks.find((task) => {
       if (task.dismissed) return false;
-      const scheduled = parseTaskDateTime(task.date, task.time);
+      const scheduled = parseTaskDateTime(
+        task.date,
+        task.time,
+        safeTimezoneOffsetMinutes
+      );
       if (!scheduled) return false;
       return scheduled >= now;
     });
