@@ -72,7 +72,7 @@ class _SmartTimeManagerAppState extends State<SmartTimeManagerApp> {
 }
 
 class ApiConfig {
-  static const String baseUrl = "http://localhost:5000/api";
+  static const String baseUrl = "https://smart-task-manager-tan.vercel.app/api";
 }
 
 class Task {

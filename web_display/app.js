@@ -1,4 +1,4 @@
-const API_BASE_URL = "http://localhost:5000";
+const API_BASE_URL = "https://smart-task-manager-tan.vercel.app";
 const DISPLAY_ENDPOINT = `${API_BASE_URL}/api/tasks/public/display-state`;
 const DISMISS_TASK_ENDPOINT = `${API_BASE_URL}/api/tasks/public`;
 const STOP_ALARM_ENDPOINT = `${API_BASE_URL}/api/alarms/public`;
