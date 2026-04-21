@@ -1,4 +1,5 @@
 const path = require("path");
+const fs = require("fs");
 const express = require("express");
 const cors = require("cors");
 const dotenv = require("dotenv");
@@ -53,7 +54,11 @@ const uploadsPath = isVercelRuntime
   : path.join(__dirname, "uploads");
 app.use("/uploads", express.static(uploadsPath));
 
-const displayPath = path.join(__dirname, "..", "tablet-web");
+const legacyDisplayPath = path.join(__dirname, "..", "tablet-web");
+const renamedDisplayPath = path.join(__dirname, "..", "web_display");
+const displayPath = fs.existsSync(renamedDisplayPath)
+  ? renamedDisplayPath
+  : legacyDisplayPath;
 app.use("/display", express.static(displayPath));
 
 if (!isVercelRuntime) {
