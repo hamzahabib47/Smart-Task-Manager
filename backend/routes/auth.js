@@ -13,6 +13,16 @@ const User = require("../models/User");
 
 const router = express.Router();
 
+const isDbUnavailableError = (error) => {
+  const msg = (error?.message || "").toLowerCase();
+  return (
+    msg.includes("buffering timed out") ||
+    msg.includes("topology") ||
+    msg.includes("server selection") ||
+    msg.includes("not connected")
+  );
+};
+
 router.post("/auth/register", async (req, res) => {
   try {
     const name = (req.body.name || "").trim();
@@ -78,7 +88,7 @@ router.post("/auth/login", async (req, res) => {
     if (!user) {
       return res.status(404).json({
         success: false,
-        message: "Incorrect email",
+        message: "No account found with this email. Please register first.",
       });
     }
 
@@ -112,6 +122,13 @@ router.post("/auth/login", async (req, res) => {
       },
     });
   } catch (error) {
+    if (isDbUnavailableError(error)) {
+      return res.status(503).json({
+        success: false,
+        message: "Service temporarily unavailable. Please try again in a moment.",
+      });
+    }
+
     return res.status(500).json({
       success: false,
       message: "Server error",
