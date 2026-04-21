@@ -106,6 +106,10 @@ router.get("/tasks/public/latest", async (_req, res) => {
 
 router.get("/tasks/public/display-state", async (_req, res) => {
   try {
+    res.set("Cache-Control", "no-store, no-cache, must-revalidate");
+    res.set("Pragma", "no-cache");
+    res.set("Expires", "0");
+
     const alarmAutoStopSeconds = 30;
     const reminderAutoDismissSeconds = 30;
     const now = new Date();

@@ -316,7 +316,14 @@ function applySlideshowData(result) {
 
 async function loadDisplayState() {
   try {
-    const res = await fetch(DISPLAY_ENDPOINT);
+    const endpoint = `${DISPLAY_ENDPOINT}?t=${Date.now()}`;
+    const res = await fetch(endpoint, {
+      cache: "no-store",
+      headers: {
+        "Cache-Control": "no-cache",
+        Pragma: "no-cache",
+      },
+    });
     const result = await res.json();
 
     if (!result.success) {

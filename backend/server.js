@@ -59,7 +59,18 @@ const renamedDisplayPath = path.join(__dirname, "..", "web_display");
 const displayPath = fs.existsSync(renamedDisplayPath)
   ? renamedDisplayPath
   : legacyDisplayPath;
-app.use("/display", express.static(displayPath));
+app.use(
+  "/display",
+  express.static(displayPath, {
+    etag: false,
+    lastModified: false,
+    setHeaders: (res) => {
+      res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
+      res.setHeader("Pragma", "no-cache");
+      res.setHeader("Expires", "0");
+    },
+  })
+);
 
 if (!isVercelRuntime) {
   const PORT = process.env.PORT || 5000;
