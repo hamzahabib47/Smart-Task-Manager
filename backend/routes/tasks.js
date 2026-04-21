@@ -20,15 +20,16 @@ const parseTaskDateTime = (dateText, timeText, timezoneOffsetMinutes = 0) => {
   const hour = Number(timeMatch[1]);
   const minute = Number(timeMatch[2]);
 
+  // timezoneOffsetMinutes is local - UTC. Convert local task time to UTC instant.
   const utcMs =
-    Date.UTC(year, month - 1, day, hour, minute, 0) + timezoneOffsetMinutes * 60000;
+    Date.UTC(year, month - 1, day, hour, minute, 0) - timezoneOffsetMinutes * 60000;
   const parsed = new Date(utcMs);
   if (Number.isNaN(parsed.getTime())) return null;
   return parsed;
 };
 
 const localNowByOffset = (nowUtc, timezoneOffsetMinutes = 0) => {
-  return new Date(nowUtc.getTime() - timezoneOffsetMinutes * 60000);
+  return new Date(nowUtc.getTime() + timezoneOffsetMinutes * 60000);
 };
 
 const isSameMinute = (a, b) =>
@@ -149,6 +150,15 @@ router.get("/tasks/public/display-state", async (_req, res) => {
       timeFormat,
       timezoneOffsetMinutes: safeTimezoneOffsetMinutes,
     };
+
+    if (!displayUserId) {
+      return res.json({
+        ...basePayload,
+        mode: "slideshow",
+        slideshowPhotos: [],
+        reminder: null,
+      });
+    }
 
     const photos = await Photo.find(dataScope || {}).sort({ createdAt: -1 }).limit(30);
     const slideshowPhotos = photos.map((photo) => photo.url);
