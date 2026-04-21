@@ -18,6 +18,15 @@ const photoSchema = new mongoose.Schema(
       required: true,
       trim: true,
     },
+    mimeType: {
+      type: String,
+      default: "image/jpeg",
+      trim: true,
+    },
+    dataBase64: {
+      type: String,
+      default: "",
+    },
   },
   {
     timestamps: true,

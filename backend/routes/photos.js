@@ -19,15 +19,7 @@ try {
   console.error("Failed to initialize upload directory:", error.message);
 }
 
-const storage = multer.diskStorage({
-  destination: (_req, _file, cb) => cb(null, uploadDir),
-  filename: (_req, file, cb) => {
-    const safeName = file.originalname.replace(/[^a-zA-Z0-9._-]/g, "_");
-    cb(null, `${Date.now()}_${safeName}`);
-  },
-});
-
-const upload = multer({ storage });
+const upload = multer({ storage: multer.memoryStorage() });
 
 router.get("/photos/public", async (_req, res) => {
   try {
@@ -37,6 +29,41 @@ router.get("/photos/public", async (_req, res) => {
       success: true,
       count: photos.length,
       data: photos,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Server error",
+      error: error.message,
+    });
+  }
+});
+
+router.get("/photos/:id/file", async (req, res) => {
+  try {
+    const photo = await Photo.findById(req.params.id);
+    if (!photo) {
+      return res.status(404).json({
+        success: false,
+        message: "Photo not found",
+      });
+    }
+
+    if (photo.dataBase64) {
+      const binary = Buffer.from(photo.dataBase64, "base64");
+      res.set("Content-Type", photo.mimeType || "image/jpeg");
+      res.set("Cache-Control", "public, max-age=31536000, immutable");
+      return res.send(binary);
+    }
+
+    const filePath = path.join(uploadDir, photo.filename || "");
+    if (photo.filename && fs.existsSync(filePath)) {
+      return res.sendFile(filePath);
+    }
+
+    return res.status(404).json({
+      success: false,
+      message: "Photo file not found",
     });
   } catch (error) {
     return res.status(500).json({
@@ -58,11 +85,21 @@ router.post("/photos/upload", upload.single("photo"), async (req, res) => {
       });
     }
 
+    const safeName = (req.file.originalname || "photo.jpg").replace(
+      /[^a-zA-Z0-9._-]/g,
+      "_"
+    );
+
     const photo = await Photo.create({
       user: req.user.id,
-      filename: req.file.filename,
-      url: `/uploads/${req.file.filename}`,
+      filename: `${Date.now()}_${safeName}`,
+      url: "",
+      mimeType: req.file.mimetype || "image/jpeg",
+      dataBase64: req.file.buffer.toString("base64"),
     });
+
+    photo.url = `/api/photos/${photo._id}/file`;
+    await photo.save();
 
     return res.status(201).json({
       success: true,
@@ -110,8 +147,8 @@ router.delete("/photos/:id", async (req, res) => {
       });
     }
 
-    const filePath = path.join(uploadDir, photo.filename);
-    if (fs.existsSync(filePath)) {
+    const filePath = path.join(uploadDir, photo.filename || "");
+    if (photo.filename && fs.existsSync(filePath)) {
       fs.unlinkSync(filePath);
     }
 

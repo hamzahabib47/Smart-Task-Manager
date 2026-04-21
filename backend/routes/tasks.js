@@ -83,7 +83,6 @@ router.get("/tasks/public/display-state", async (_req, res) => {
     const alarmAutoStopSeconds = 30;
     const reminderAutoDismissSeconds = 30;
     const now = new Date();
-    const inFiveMinutes = new Date(now.getTime() + 5 * 60 * 1000);
     const todayText = localDateText(now);
 
     const latestSetting = await Setting.findOne().sort({ updatedAt: -1 });
@@ -263,7 +262,7 @@ router.get("/tasks/public/display-state", async (_req, res) => {
       if (task.dismissed) return false;
       const scheduled = parseTaskDateTime(task.date, task.time);
       if (!scheduled) return false;
-      return scheduled >= now && scheduled <= inFiveMinutes;
+      return scheduled >= now;
     });
 
     if (pushNotifications && nextTask) {
