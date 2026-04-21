@@ -30,14 +30,13 @@ stm/
     lib/
       main.dart
     pubspec.yaml
-  tablet-web/
+  web_display/
     index.html
     styles.css
     app.js
   README.md
 ```
 
-Note: The folder is named `tablet-web`, but in product behavior it is the display web app.
 
 ## Key Features
 
