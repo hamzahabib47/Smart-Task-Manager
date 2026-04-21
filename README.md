@@ -1,6 +1,6 @@
-# Smart Time Manager
+# Smart Task Manager
 
-Smart Time Manager is a multi-client scheduling system with:
+Smart Task Manager is a multi-client scheduling system with:
 
 1. Backend API (Node.js + Express + MongoDB)
 2. Mobile controller app (Flutter)
