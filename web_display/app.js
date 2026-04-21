@@ -2,6 +2,7 @@ const API_BASE_URL = "https://smart-task-manager-tan.vercel.app";
 const DISPLAY_ENDPOINT = `${API_BASE_URL}/api/tasks/public/display-state`;
 const DISMISS_TASK_ENDPOINT = `${API_BASE_URL}/api/tasks/public`;
 const STOP_ALARM_ENDPOINT = `${API_BASE_URL}/api/alarms/public`;
+const ALARM_VOLUME = 0.22;
 
 const screen = document.getElementById("screen");
 const heroImage = document.getElementById("heroImage");
@@ -166,7 +167,7 @@ function playAlarmBeep() {
   const master = ctx.createGain();
   master.connect(ctx.destination);
   master.gain.setValueAtTime(0.0001, now);
-  master.gain.exponentialRampToValueAtTime(0.1, now + 0.03);
+  master.gain.exponentialRampToValueAtTime(ALARM_VOLUME, now + 0.03);
   master.gain.exponentialRampToValueAtTime(0.0001, now + 0.62);
 
   const toneA = ctx.createOscillator();
