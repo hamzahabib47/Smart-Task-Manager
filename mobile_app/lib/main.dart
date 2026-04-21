@@ -2688,71 +2688,53 @@ class _TaskScreenState extends State<TaskScreen> {
                   ),
                 ),
                 const SizedBox(height: 10),
-                Row(
-                  children: [
-                    Expanded(
-                      child: CheckboxListTile(
-                        dense: true,
-                        contentPadding: EdgeInsets.zero,
-                        value: pushNotifications,
-                        title: const Text("Push notifications"),
-                        controlAffinity: ListTileControlAffinity.trailing,
-                        onChanged: (v) {
-                          if (v == null) return;
-                          setState(() => pushNotifications = v);
-                          saveSettings(showSuccess: false);
-                        },
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: CheckboxListTile(
-                        dense: true,
-                        contentPadding: EdgeInsets.zero,
-                        value: buzzerAlerts,
-                        title: const Text("Buzzer alerts"),
-                        controlAffinity: ListTileControlAffinity.trailing,
-                        onChanged: (v) {
-                          if (v == null) return;
-                          setState(() => buzzerAlerts = v);
-                          saveSettings(showSuccess: false);
-                        },
-                      ),
-                    ),
-                  ],
+                CheckboxListTile(
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  value: pushNotifications,
+                  title: const Text("Push notifications"),
+                  controlAffinity: ListTileControlAffinity.trailing,
+                  onChanged: (v) {
+                    if (v == null) return;
+                    setState(() => pushNotifications = v);
+                    saveSettings(showSuccess: false);
+                  },
                 ),
-                Row(
-                  children: [
-                    Expanded(
-                      child: CheckboxListTile(
-                        dense: true,
-                        contentPadding: EdgeInsets.zero,
-                        value: autoClockSync,
-                        title: const Text("Auto clock sync"),
-                        controlAffinity: ListTileControlAffinity.trailing,
-                        onChanged: (v) {
-                          if (v == null) return;
-                          setState(() => autoClockSync = v);
-                          saveSettings(showSuccess: false);
-                        },
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: CheckboxListTile(
-                        dense: true,
-                        contentPadding: EdgeInsets.zero,
-                        value: archiveCompletedTasks,
-                        title: const Text("Archive completed tasks"),
-                        controlAffinity: ListTileControlAffinity.trailing,
-                        onChanged: (v) {
-                          if (v == null) return;
-                          setState(() => archiveCompletedTasks = v);
-                          saveSettings(showSuccess: false);
-                        },
-                      ),
-                    ),
-                  ],
+                CheckboxListTile(
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  value: buzzerAlerts,
+                  title: const Text("Buzzer alerts"),
+                  controlAffinity: ListTileControlAffinity.trailing,
+                  onChanged: (v) {
+                    if (v == null) return;
+                    setState(() => buzzerAlerts = v);
+                    saveSettings(showSuccess: false);
+                  },
+                ),
+                CheckboxListTile(
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  value: autoClockSync,
+                  title: const Text("Auto clock sync"),
+                  controlAffinity: ListTileControlAffinity.trailing,
+                  onChanged: (v) {
+                    if (v == null) return;
+                    setState(() => autoClockSync = v);
+                    saveSettings(showSuccess: false);
+                  },
+                ),
+                CheckboxListTile(
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  value: archiveCompletedTasks,
+                  title: const Text("Archive completed tasks"),
+                  controlAffinity: ListTileControlAffinity.trailing,
+                  onChanged: (v) {
+                    if (v == null) return;
+                    setState(() => archiveCompletedTasks = v);
+                    saveSettings(showSuccess: false);
+                  },
                 ),
                 const SizedBox(height: 8),
                 LayoutBuilder(
