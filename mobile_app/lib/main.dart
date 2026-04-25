@@ -31,22 +31,29 @@ class _SmartTimeManagerAppState extends State<SmartTimeManagerApp> {
   }
 
   Future<void> _restoreAuthState() async {
+    // Show splash screen for at least 2 seconds
+    await Future.delayed(const Duration(seconds: 2));
+
     final prefs = await SharedPreferences.getInstance();
     final savedToken = prefs.getString('auth_token');
     final savedEmail = prefs.getString('auth_email');
     final savedName = prefs.getString('auth_name');
 
     if (savedToken != null && savedToken.isNotEmpty) {
-      setState(() {
-        token = savedToken;
-        signedInEmail = savedEmail;
-        signedInName = savedName;
-        isInitialized = true;
-      });
+      if (mounted) {
+        setState(() {
+          token = savedToken;
+          signedInEmail = savedEmail;
+          signedInName = savedName;
+          isInitialized = true;
+        });
+      }
     } else {
-      setState(() {
-        isInitialized = true;
-      });
+      if (mounted) {
+        setState(() {
+          isInitialized = true;
+        });
+      }
     }
   }
 
@@ -103,9 +110,7 @@ class _SmartTimeManagerAppState extends State<SmartTimeManagerApp> {
         ),
       ),
       home: !isInitialized
-          ? const Scaffold(
-              body: Center(child: CircularProgressIndicator()),
-            )
+          ? const SplashScreen()
           : token == null
               ? AuthScreen(onLoggedIn: onLoggedIn)
               : TaskScreen(
@@ -118,9 +123,94 @@ class _SmartTimeManagerAppState extends State<SmartTimeManagerApp> {
   }
 }
 
+class SplashScreen extends StatelessWidget {
+  const SplashScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Color(0xFF0D9488),
+              Color(0xFF06A092),
+              Color(0xFF0E9B8B),
+            ],
+          ),
+        ),
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 120,
+                height: 120,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.95),
+                  borderRadius: BorderRadius.circular(30),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.2),
+                      blurRadius: 20,
+                      offset: const Offset(0, 10),
+                    )
+                  ],
+                ),
+                child: const Icon(
+                  Icons.task_alt,
+                  size: 60,
+                  color: Color(0xFF0D9488),
+                ),
+              ),
+              const SizedBox(height: 32),
+              const Text(
+                "Smart Task Manager",
+                style: TextStyle(
+                  fontSize: 28,
+                  fontWeight: FontWeight.w900,
+                  color: Colors.white,
+                  letterSpacing: 0.5,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                "Organize. Manage. Achieve.",
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.white70,
+                  fontWeight: FontWeight.w500,
+                  letterSpacing: 0.3,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 60),
+              SizedBox(
+                width: 50,
+                height: 50,
+                child: CircularProgressIndicator(
+                  valueColor: AlwaysStoppedAnimation<Color>(
+                    Colors.white.withValues(alpha: 0.8),
+                  ),
+                  strokeWidth: 4,
+                ),
+              ),
+              const SizedBox(height: 40),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class ApiConfig {
   static const String baseUrl = "https://smart-task-manager-tan.vercel.app/api";
 }
+
 
 class Task {
   final String id;
