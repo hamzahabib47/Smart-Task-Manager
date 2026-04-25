@@ -4,6 +4,51 @@ const DISMISS_TASK_ENDPOINT = `${API_BASE_URL}/api/tasks/public`;
 const STOP_ALARM_ENDPOINT = `${API_BASE_URL}/api/alarms/public`;
 const ALARM_VOLUME = 0.22;
 
+// Socket.IO connection for real-time updates
+let socket = null;
+let pollingFallbackTimer = null;
+
+function initializeSocketConnection() {
+  try {
+    // Import Socket.IO client library
+    const script = document.createElement("script");
+    script.src = `${API_BASE_URL}/socket.io/socket.io.js`;
+    script.onload = () => {
+      socket = io(API_BASE_URL, {
+        reconnection: true,
+        reconnectionDelay: 1000,
+        reconnectionDelayMax: 5000,
+        reconnectionAttempts: 5,
+      });
+
+      socket.on("connect", () => {
+        console.log("Connected to WebSocket server");
+        clearInterval(pollingFallbackTimer);
+      });
+
+      socket.on("dataUpdated", (data) => {
+        console.log("Data updated via WebSocket:", data);
+        loadDisplayState();
+      });
+
+      socket.on("disconnect", () => {
+        console.log("Disconnected from WebSocket server, using polling fallback");
+        // Fallback to polling if WebSocket disconnects
+        pollingFallbackTimer = setInterval(loadDisplayState, 5000);
+      });
+
+      socket.on("error", (error) => {
+        console.error("WebSocket error:", error);
+      });
+    };
+    document.head.appendChild(script);
+  } catch (error) {
+    console.error("Failed to initialize Socket.IO:", error);
+    // Fallback to polling
+    pollingFallbackTimer = setInterval(loadDisplayState, 5000);
+  }
+}
+
 const screen = document.getElementById("screen");
 const heroImage = document.getElementById("heroImage");
 const contentCard = document.getElementById("contentCard");
@@ -530,5 +575,5 @@ document.addEventListener(
 
 startClock();
 ensureCountdownTimer();
+initializeSocketConnection();
 loadDisplayState();
-setInterval(loadDisplayState, 2000);

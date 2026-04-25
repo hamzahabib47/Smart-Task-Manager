@@ -3,6 +3,7 @@ const fs = require("fs");
 const path = require("path");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
+const crypto = require("crypto");
 
 const authMiddleware = require("../middleware/auth");
 const Alarm = require("../models/Alarm");
@@ -241,6 +242,124 @@ router.delete("/auth/account", authMiddleware, async (req, res) => {
     return res.json({
       success: true,
       message: "Account deleted successfully",
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Server error",
+      error: error.message,
+    });
+  }
+});
+
+router.post("/auth/forgot-password", async (req, res) => {
+  try {
+    const email = (req.body.email || "").trim().toLowerCase();
+
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: "email is required",
+      });
+    }
+
+    const user = await User.findOne({ email });
+    if (!user) {
+      // For security, don't reveal if email exists
+      return res.status(200).json({
+        success: true,
+        message: "If the email exists, a reset link will be sent.",
+      });
+    }
+
+    // Generate a secure random token
+    const resetToken = crypto.randomBytes(32).toString("hex");
+    const resetTokenExpiry = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
+
+    // Save token and expiry to user
+    user.resetToken = resetToken;
+    user.resetTokenExpiry = resetTokenExpiry;
+    await user.save();
+
+    // For now, return the reset link in response (no email service)
+    const resetLink = `https://yourdomain.com/reset-password/${resetToken}`;
+
+    return res.json({
+      success: true,
+      message: "Password reset link generated",
+      data: {
+        resetLink,
+        expiresIn: "15 minutes",
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Server error",
+      error: error.message,
+    });
+  }
+});
+
+router.post("/auth/reset-password", async (req, res) => {
+  try {
+    const token = (req.body.token || "").trim();
+    const newPassword = req.body.newPassword || "";
+
+    if (!token) {
+      return res.status(400).json({
+        success: false,
+        message: "Reset token is required",
+      });
+    }
+
+    if (!newPassword) {
+      return res.status(400).json({
+        success: false,
+        message: "New password is required",
+      });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({
+        success: false,
+        message: "Password must be at least 6 characters",
+      });
+    }
+
+    // Find user by reset token
+    const user = await User.findOne({ resetToken: token });
+    if (!user) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid or expired reset token",
+      });
+    }
+
+    // Check if token is expired
+    if (user.resetTokenExpiry < new Date()) {
+      return res.status(400).json({
+        success: false,
+        message: "Reset token has expired",
+      });
+    }
+
+    // Hash the new password
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+
+    // Update user password and clear reset token
+    user.passwordHash = passwordHash;
+    user.resetToken = null;
+    user.resetTokenExpiry = null;
+    await user.save();
+
+    return res.json({
+      success: true,
+      message: "Password reset successfully",
+      data: {
+        id: user._id,
+        email: user.email,
+      },
     });
   } catch (error) {
     return res.status(500).json({

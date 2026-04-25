@@ -384,6 +384,12 @@ router.patch("/tasks/public/:id/dismiss", async (req, res) => {
       });
     }
 
+    // Emit WebSocket event for real-time update
+    const io = req.app.locals.io;
+    if (io) {
+      io.emit("dataUpdated", { type: "task", action: "dismissed", data: task });
+    }
+
     return res.json({
       success: true,
       message: "Reminder dismissed",
@@ -418,6 +424,12 @@ router.post("/tasks", async (req, res) => {
       date,
       time,
     });
+
+    // Emit WebSocket event for real-time update
+    const io = req.app.locals.io;
+    if (io) {
+      io.emit("dataUpdated", { type: "task", action: "created", data: task });
+    }
 
     res.status(201).json({
       success: true,
@@ -479,6 +491,12 @@ router.put("/tasks/:id", async (req, res) => {
       });
     }
 
+    // Emit WebSocket event for real-time update
+    const io = req.app.locals.io;
+    if (io) {
+      io.emit("dataUpdated", { type: "task", action: "updated", data: task });
+    }
+
     return res.json({
       success: true,
       message: "Task updated",
@@ -507,6 +525,12 @@ router.delete("/tasks/:id", async (req, res) => {
       });
     }
 
+    // Emit WebSocket event for real-time update
+    const io = req.app.locals.io;
+    if (io) {
+      io.emit("dataUpdated", { type: "task", action: "deleted", data: task });
+    }
+
     return res.json({
       success: true,
       message: "Task deleted",
@@ -533,6 +557,12 @@ router.patch("/tasks/:id/complete", async (req, res) => {
         success: false,
         message: "Task not found",
       });
+    }
+
+    // Emit WebSocket event for real-time update
+    const io = req.app.locals.io;
+    if (io) {
+      io.emit("dataUpdated", { type: "task", action: "completed", data: task });
     }
 
     return res.json({
@@ -564,6 +594,12 @@ router.patch("/tasks/:id/archive", async (req, res) => {
       });
     }
 
+    // Emit WebSocket event for real-time update
+    const io = req.app.locals.io;
+    if (io) {
+      io.emit("dataUpdated", { type: "task", action: "archived", data: task });
+    }
+
     return res.json({
       success: true,
       message: "Task archived",
@@ -591,6 +627,12 @@ router.patch("/tasks/:id/dismiss", async (req, res) => {
         success: false,
         message: "Task not found",
       });
+    }
+
+    // Emit WebSocket event for real-time update
+    const io = req.app.locals.io;
+    if (io) {
+      io.emit("dataUpdated", { type: "task", action: "dismissed", data: task });
     }
 
     return res.json({

@@ -214,6 +214,12 @@ router.put("/settings", async (req, res) => {
       { new: true, upsert: true, setDefaultsOnInsert: true }
     );
 
+    // Emit WebSocket event for real-time update
+    const io = req.app.locals.io;
+    if (io) {
+      io.emit("dataUpdated", { type: "settings", action: "updated", data: setting });
+    }
+
     return res.json({
       success: true,
       message: "Settings updated",

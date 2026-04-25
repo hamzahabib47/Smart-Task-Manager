@@ -36,6 +36,12 @@ router.patch("/alarms/public/:id/stop", async (req, res) => {
       });
     }
 
+    // Emit WebSocket event for real-time update
+    const io = req.app.locals.io;
+    if (io) {
+      io.emit("dataUpdated", { type: "alarm", action: "stopped", data: alarm });
+    }
+
     return res.json({
       success: true,
       message: "Alarm stopped",
@@ -94,6 +100,12 @@ router.post("/alarms", async (req, res) => {
       time,
       recurrence,
     });
+
+    // Emit WebSocket event for real-time update
+    const io = req.app.locals.io;
+    if (io) {
+      io.emit("dataUpdated", { type: "alarm", action: "created", data: alarm });
+    }
 
     return res.status(201).json({
       success: true,
@@ -154,6 +166,12 @@ router.patch("/alarms/:id/stop", async (req, res) => {
       });
     }
 
+    // Emit WebSocket event for real-time update
+    const io = req.app.locals.io;
+    if (io) {
+      io.emit("dataUpdated", { type: "alarm", action: "stopped", data: alarm });
+    }
+
     return res.json({
       success: true,
       message: "Alarm stopped",
@@ -196,6 +214,12 @@ router.patch("/alarms/:id/toggle", async (req, res) => {
       });
     }
 
+    // Emit WebSocket event for real-time update
+    const io = req.app.locals.io;
+    if (io) {
+      io.emit("dataUpdated", { type: "alarm", action: "toggled", data: alarm });
+    }
+
     return res.json({
       success: true,
       message: enabled ? "Alarm enabled" : "Alarm disabled",
@@ -222,6 +246,12 @@ router.delete("/alarms/:id", async (req, res) => {
         success: false,
         message: "Alarm not found",
       });
+    }
+
+    // Emit WebSocket event for real-time update
+    const io = req.app.locals.io;
+    if (io) {
+      io.emit("dataUpdated", { type: "alarm", action: "deleted", data: alarm });
     }
 
     return res.json({

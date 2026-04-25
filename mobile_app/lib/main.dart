@@ -755,6 +755,22 @@ class _AuthScreenState extends State<AuthScreen> {
             minimumSize: const Size.fromHeight(48),
           ),
         ),
+        if (!isRegister) ...[
+          const SizedBox(height: 8),
+          OutlinedButton(
+            onPressed: isLoading
+                ? null
+                : () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const ForgotPasswordScreen(),
+                      ),
+                    );
+                  },
+            child: const Text("Forgot Password?"),
+          ),
+        ],
         const SizedBox(height: 8),
         Builder(
           builder: (context) {
@@ -3352,6 +3368,490 @@ class _TaskScreenState extends State<TaskScreen> {
                 ),
               );
             },
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class ForgotPasswordScreen extends StatefulWidget {
+  const ForgotPasswordScreen({super.key});
+
+  @override
+  State<ForgotPasswordScreen> createState() => _ForgotPasswordScreenState();
+}
+
+class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
+  final TextEditingController emailController = TextEditingController();
+  bool isLoading = false;
+  String? emailError;
+  String? successMessage;
+  String? resetLink;
+  static final RegExp _emailRegex = RegExp(r"^[^\s@]+@[^\s@]+\.[^\s@]+$");
+
+  Map<String, dynamic> _tryDecodeBody(String body) {
+    try {
+      final decoded = json.decode(body);
+      if (decoded is Map<String, dynamic>) {
+        return decoded;
+      }
+    } catch (_) {}
+    return const <String, dynamic>{};
+  }
+
+  String _extractApiMessage(http.Response response, String fallback) {
+    final body = _tryDecodeBody(response.body);
+    final message = body["message"];
+    if (message is String && message.trim().isNotEmpty) {
+      return message.trim();
+    }
+    return fallback;
+  }
+
+  Future<void> sendResetLink() async {
+    if (isLoading) return;
+
+    final email = emailController.text.trim().toLowerCase();
+
+    setState(() {
+      emailError = null;
+      successMessage = null;
+      resetLink = null;
+    });
+
+    if (email.isEmpty) {
+      setState(() => emailError = "Email is required");
+      return;
+    }
+
+    if (!_emailRegex.hasMatch(email)) {
+      setState(() => emailError = "Enter a valid email address");
+      return;
+    }
+
+    setState(() => isLoading = true);
+
+    try {
+      final response = await http
+          .post(
+            Uri.parse("${ApiConfig.baseUrl}/auth/forgot-password"),
+            headers: {"Content-Type": "application/json"},
+            body: json.encode({"email": email}),
+          )
+          .timeout(const Duration(seconds: 30));
+
+      if (!mounted) return;
+
+      if (response.statusCode == 200) {
+        final body = _tryDecodeBody(response.body);
+        final data = body["data"] as Map<String, dynamic>?;
+        final link = data?["resetLink"] as String?;
+
+        setState(() {
+          successMessage = "Reset link generated successfully!";
+          resetLink = link;
+        });
+      } else {
+        final message =
+            _extractApiMessage(response, "Failed to send reset link");
+        setState(() => emailError = message);
+      }
+    } on TimeoutException {
+      setState(() =>
+          emailError = "Request timed out. Please try again.");
+    } on SocketException {
+      setState(() =>
+          emailError = "No internet connection or server unreachable.");
+    } catch (_) {
+      setState(() => emailError = "Server error. Please try again later.");
+    } finally {
+      if (mounted) {
+        setState(() => isLoading = false);
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    emailController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text("Forgot Password"),
+        centerTitle: false,
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(24),
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 430),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Text(
+                  "Reset Your Password",
+                  style: TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF0F172A),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  "Enter your email address and we'll send you a link to reset your password.",
+                  style: TextStyle(
+                    color: Color(0xFF6B7280),
+                    fontSize: 14,
+                  ),
+                ),
+                const SizedBox(height: 32),
+                if (resetLink != null) ...[
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFD1FAE5),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: const Color(0xFF10B981),
+                        width: 1,
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          "✓ Reset Link Generated",
+                          style: TextStyle(
+                            color: Color(0xFF059669),
+                            fontWeight: FontWeight.w600,
+                            fontSize: 14,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          resetLink!,
+                          style: const TextStyle(
+                            color: Color(0xFF047857),
+                            fontSize: 12,
+                            fontFamily: "monospace",
+                          ),
+                          selectionColor: Colors.grey[300],
+                        ),
+                        const SizedBox(height: 12),
+                        FilledButton.icon(
+                          onPressed: () {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text("Link copied to clipboard"),
+                                duration: Duration(seconds: 2),
+                              ),
+                            );
+                          },
+                          icon: const Icon(Icons.copy),
+                          label: const Text("Copy Link"),
+                          style: FilledButton.styleFrom(
+                            backgroundColor: const Color(0xFF10B981),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                ],
+                TextField(
+                  controller: emailController,
+                  keyboardType: TextInputType.emailAddress,
+                  textInputAction: TextInputAction.done,
+                  onSubmitted: (_) => sendResetLink(),
+                  onChanged: (_) {
+                    if (emailError != null) {
+                      setState(() => emailError = null);
+                    }
+                  },
+                  decoration: InputDecoration(
+                    labelText: "Email",
+                    prefixIcon: const Icon(Icons.alternate_email),
+                    errorText: emailError,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                FilledButton.icon(
+                  onPressed: isLoading ? null : sendResetLink,
+                  icon: const Icon(Icons.mail_outline),
+                  label: const Text("Send Reset Link"),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xFFE95B0C),
+                    foregroundColor: Colors.white,
+                    minimumSize: const Size.fromHeight(48),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text("Back to Sign In"),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class ResetPasswordScreen extends StatefulWidget {
+  final String resetToken;
+
+  const ResetPasswordScreen({super.key, required this.resetToken});
+
+  @override
+  State<ResetPasswordScreen> createState() => _ResetPasswordScreenState();
+}
+
+class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
+  final TextEditingController newPasswordController = TextEditingController();
+  final TextEditingController confirmPasswordController =
+      TextEditingController();
+  bool isLoading = false;
+  String? newPasswordError;
+  String? confirmPasswordError;
+  String? generalError;
+  String? successMessage;
+
+  Map<String, dynamic> _tryDecodeBody(String body) {
+    try {
+      final decoded = json.decode(body);
+      if (decoded is Map<String, dynamic>) {
+        return decoded;
+      }
+    } catch (_) {}
+    return const <String, dynamic>{};
+  }
+
+  String _extractApiMessage(http.Response response, String fallback) {
+    final body = _tryDecodeBody(response.body);
+    final message = body["message"];
+    if (message is String && message.trim().isNotEmpty) {
+      return message.trim();
+    }
+    return fallback;
+  }
+
+  Future<void> resetPassword() async {
+    if (isLoading) return;
+
+    final newPassword = newPasswordController.text;
+    final confirmPassword = confirmPasswordController.text;
+
+    setState(() {
+      newPasswordError = null;
+      confirmPasswordError = null;
+      generalError = null;
+    });
+
+    bool hasError = false;
+
+    if (newPassword.isEmpty) {
+      setState(() => newPasswordError = "New password is required");
+      hasError = true;
+    } else if (newPassword.length < 6) {
+      setState(() =>
+          newPasswordError = "Password must be at least 6 characters");
+      hasError = true;
+    }
+
+    if (confirmPassword.isEmpty) {
+      setState(() => confirmPasswordError = "Confirm password is required");
+      hasError = true;
+    }
+
+    if (newPassword != confirmPassword) {
+      setState(() =>
+          confirmPasswordError = "Passwords do not match");
+      hasError = true;
+    }
+
+    if (hasError) {
+      setState(() {});
+      return;
+    }
+
+    setState(() => isLoading = true);
+
+    try {
+      final response = await http
+          .post(
+            Uri.parse("${ApiConfig.baseUrl}/auth/reset-password"),
+            headers: {"Content-Type": "application/json"},
+            body: json.encode({
+              "token": widget.resetToken,
+              "newPassword": newPassword,
+            }),
+          )
+          .timeout(const Duration(seconds: 30));
+
+      if (!mounted) return;
+
+      if (response.statusCode == 200) {
+        setState(() =>
+            successMessage = "Password reset successfully! Redirecting...");
+        
+        await Future.delayed(const Duration(seconds: 2));
+        if (mounted) {
+          Navigator.pop(context);
+          Navigator.pop(context);
+        }
+      } else {
+        final message =
+            _extractApiMessage(response, "Failed to reset password");
+        setState(() => generalError = message);
+      }
+    } on TimeoutException {
+      setState(() =>
+          generalError = "Request timed out. Please try again.");
+    } on SocketException {
+      setState(() =>
+          generalError = "No internet connection or server unreachable.");
+    } catch (_) {
+      setState(() => generalError = "Server error. Please try again later.");
+    } finally {
+      if (mounted) {
+        setState(() => isLoading = false);
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    newPasswordController.dispose();
+    confirmPasswordController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text("Reset Password"),
+        centerTitle: false,
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(24),
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 430),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Text(
+                  "Create New Password",
+                  style: TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF0F172A),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  "Enter your new password below. Make sure it's at least 6 characters long.",
+                  style: TextStyle(
+                    color: Color(0xFF6B7280),
+                    fontSize: 14,
+                  ),
+                ),
+                const SizedBox(height: 32),
+                if (successMessage != null) ...[
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFD1FAE5),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: const Color(0xFF10B981),
+                        width: 1,
+                      ),
+                    ),
+                    child: Text(
+                      "✓ $successMessage",
+                      style: const TextStyle(
+                        color: Color(0xFF059669),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                ],
+                if (generalError != null) ...[
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFEE2E2),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: const Color(0xFFDC2626),
+                        width: 1,
+                      ),
+                    ),
+                    child: Text(
+                      generalError!,
+                      style: const TextStyle(
+                        color: Color(0xFFB91C1C),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                ],
+                TextField(
+                  controller: newPasswordController,
+                  obscureText: true,
+                  textInputAction: TextInputAction.next,
+                  onChanged: (_) {
+                    if (newPasswordError != null) {
+                      setState(() => newPasswordError = null);
+                    }
+                  },
+                  decoration: InputDecoration(
+                    labelText: "New Password",
+                    prefixIcon: const Icon(Icons.lock_outline),
+                    errorText: newPasswordError,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: confirmPasswordController,
+                  obscureText: true,
+                  textInputAction: TextInputAction.done,
+                  onSubmitted: (_) => resetPassword(),
+                  onChanged: (_) {
+                    if (confirmPasswordError != null) {
+                      setState(() => confirmPasswordError = null);
+                    }
+                  },
+                  decoration: InputDecoration(
+                    labelText: "Confirm Password",
+                    prefixIcon: const Icon(Icons.lock_reset_outlined),
+                    errorText: confirmPasswordError,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                FilledButton.icon(
+                  onPressed: isLoading ? null : resetPassword,
+                  icon: const Icon(Icons.check_circle_outline),
+                  label: const Text("Reset Password"),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xFFE95B0C),
+                    foregroundColor: Colors.white,
+                    minimumSize: const Size.fromHeight(48),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

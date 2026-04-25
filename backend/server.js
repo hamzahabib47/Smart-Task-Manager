@@ -3,6 +3,8 @@ const fs = require("fs");
 const express = require("express");
 const cors = require("cors");
 const dotenv = require("dotenv");
+const http = require("http");
+const { Server } = require("socket.io");
 
 const connectDB = require("./config/db");
 const authRoutes = require("./routes/auth");
@@ -74,8 +76,32 @@ app.use(
 
 if (!isVercelRuntime) {
   const PORT = process.env.PORT || 5000;
-  app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
+  
+  // Create HTTP server
+  const httpServer = http.createServer(app);
+  
+  // Setup Socket.IO with CORS
+  const io = new Server(httpServer, {
+    cors: {
+      origin: "*",
+      methods: ["GET", "POST"],
+    },
+  });
+
+  // Store io instance for access in routes
+  app.locals.io = io;
+
+  // Socket.IO connection handling
+  io.on("connection", (socket) => {
+    console.log(`Client connected: ${socket.id}`);
+
+    socket.on("disconnect", () => {
+      console.log(`Client disconnected: ${socket.id}`);
+    });
+  });
+
+  httpServer.listen(PORT, () => {
+    console.log(`Server running on port ${PORT} with Socket.IO`);
     startDailySummaryScheduler();
   });
 }

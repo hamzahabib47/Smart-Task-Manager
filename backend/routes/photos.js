@@ -126,6 +126,12 @@ router.post("/photos/upload", (req, res) => {
         dataBase64: req.file.buffer.toString("base64"),
       });
 
+      // Emit WebSocket event for real-time update
+      const io = req.app.locals.io;
+      if (io) {
+        io.emit("dataUpdated", { type: "photo", action: "uploaded", data: photo });
+      }
+
       return res.status(201).json({
         success: true,
         message: "Photo uploaded",
@@ -176,6 +182,12 @@ router.delete("/photos/:id", async (req, res) => {
     const filePath = path.join(uploadDir, photo.filename || "");
     if (photo.filename && fs.existsSync(filePath)) {
       fs.unlinkSync(filePath);
+    }
+
+    // Emit WebSocket event for real-time update
+    const io = req.app.locals.io;
+    if (io) {
+      io.emit("dataUpdated", { type: "photo", action: "deleted", data: photo });
     }
 
     return res.json({
