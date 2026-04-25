@@ -1,5 +1,6 @@
 import "dart:async";
 import "dart:convert";
+import "dart:io";
 
 import "package:flutter/material.dart";
 import "package:http/http.dart" as http;
@@ -218,7 +219,7 @@ class _AuthScreenState extends State<AuthScreen> {
           headers: {"Content-Type": "application/json"},
           body: json.encode(payload),
         )
-        .timeout(const Duration(seconds: 12));
+        .timeout(const Duration(seconds: 20));
   }
 
   void clearAuthErrors({required bool isRegister}) {
@@ -398,12 +399,20 @@ class _AuthScreenState extends State<AuthScreen> {
           loginGeneralError = "Request timed out. Please try again.";
         }
       });
+    } on SocketException {
+      setState(() {
+        if (isRegister) {
+          registerGeneralError = "No internet connection or server unreachable.";
+        } else {
+          loginGeneralError = "No internet connection or server unreachable.";
+        }
+      });
     } catch (_) {
       setState(() {
         if (isRegister) {
-          registerGeneralError = "Server error";
+          registerGeneralError = "Server error. Please try again later.";
         } else {
-          loginGeneralError = "Server error";
+          loginGeneralError = "Server error. Please try again later.";
         }
       });
     } finally {
