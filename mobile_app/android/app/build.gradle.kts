@@ -8,7 +8,6 @@ plugins {
 android {
     namespace = "com.example.smart_time_manager_mobile"
     compileSdk = flutter.compileSdkVersion
-    ndkVersion = flutter.ndkVersion
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
