@@ -1,6 +1,7 @@
 import "dart:async";
 import "dart:convert";
 import "dart:io";
+import "dart:math";
 
 import "package:flutter/material.dart";
 import "package:http/http.dart" as http;
@@ -188,20 +189,75 @@ class SplashScreen extends StatelessWidget {
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 60),
-              SizedBox(
-                width: 50,
-                height: 50,
-                child: CircularProgressIndicator(
-                  valueColor: AlwaysStoppedAnimation<Color>(
-                    Colors.white.withValues(alpha: 0.8),
-                  ),
-                  strokeWidth: 4,
-                ),
-              ),
+              const AnimatedDotsLoader(),
               const SizedBox(height: 40),
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class AnimatedDotsLoader extends StatefulWidget {
+  const AnimatedDotsLoader({super.key});
+
+  @override
+  State<AnimatedDotsLoader> createState() => _AnimatedDotsLoaderState();
+}
+
+class _AnimatedDotsLoaderState extends State<AnimatedDotsLoader>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 1200),
+      vsync: this,
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 80,
+      height: 50,
+      child: AnimatedBuilder(
+        animation: _controller,
+        builder: (context, child) {
+          return Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: List.generate(3, (index) {
+              final delay = index * 0.15;
+              final progress = (_controller.value + delay) % 1.0;
+              final scale = sin(progress * pi).clamp(0.0, 1.0);
+              final offsetY = -15 * scale;
+
+              return Transform.translate(
+                offset: Offset(0, offsetY),
+                child: Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 6),
+                  width: 12,
+                  height: 12,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(
+                      alpha: (0.3 + scale * 0.7).clamp(0.3, 1.0),
+                    ),
+                    shape: BoxShape.circle,
+                  ),
+                ),
+              );
+            }),
+          );
+        },
       ),
     );
   }
