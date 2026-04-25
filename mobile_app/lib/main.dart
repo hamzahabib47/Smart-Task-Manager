@@ -183,6 +183,43 @@ class _AuthScreenState extends State<AuthScreen> {
   String? registerPasswordError;
   String? registerConfirmPasswordError;
   String? registerGeneralError;
+  static final RegExp _emailRegex = RegExp(r"^[^\s@]+@[^\s@]+\.[^\s@]+$");
+
+  Map<String, dynamic> _tryDecodeBody(String body) {
+    try {
+      final decoded = json.decode(body);
+      if (decoded is Map<String, dynamic>) {
+        return decoded;
+      }
+    } catch (_) {
+      // Keep auth resilient for non-JSON responses.
+    }
+
+    return const <String, dynamic>{};
+  }
+
+  String _extractApiMessage(http.Response response, String fallback) {
+    final body = _tryDecodeBody(response.body);
+    final message = body["message"];
+    if (message is String && message.trim().isNotEmpty) {
+      return message.trim();
+    }
+
+    return fallback;
+  }
+
+  Future<http.Response> _postJson(
+    String endpoint,
+    Map<String, dynamic> payload,
+  ) {
+    return http
+        .post(
+          Uri.parse("${ApiConfig.baseUrl}/$endpoint"),
+          headers: {"Content-Type": "application/json"},
+          body: json.encode(payload),
+        )
+        .timeout(const Duration(seconds: 12));
+  }
 
   void clearAuthErrors({required bool isRegister}) {
     if (isRegister) {
@@ -200,6 +237,8 @@ class _AuthScreenState extends State<AuthScreen> {
   }
 
   Future<void> submit({required bool isRegister}) async {
+    if (isLoading) return;
+
     final registerName = registerNameController.text.trim();
     final email = (isRegister
             ? registerEmailController.text
@@ -226,6 +265,13 @@ class _AuthScreenState extends State<AuthScreen> {
         loginEmailError = "Email is required";
       }
       hasError = true;
+    } else if (!_emailRegex.hasMatch(email)) {
+      if (isRegister) {
+        registerEmailError = "Enter a valid email address";
+      } else {
+        loginEmailError = "Enter a valid email address";
+      }
+      hasError = true;
     }
 
     if (password.isEmpty) {
@@ -235,11 +281,6 @@ class _AuthScreenState extends State<AuthScreen> {
         loginPasswordError = "Password is required";
       }
       hasError = true;
-    }
-
-    if (!isRegister && hasError) {
-      setState(() {});
-      return;
     }
 
     if (isRegister) {
@@ -259,29 +300,31 @@ class _AuthScreenState extends State<AuthScreen> {
         hasError = true;
       }
 
-      if (hasError) {
-        setState(() {});
-        return;
-      }
+    }
+
+    if (hasError) {
+      setState(() {});
+      return;
     }
 
     setState(() => isLoading = true);
 
     try {
       if (isRegister) {
-        final registerResponse = await http.post(
-          Uri.parse("${ApiConfig.baseUrl}/auth/register"),
-          headers: {"Content-Type": "application/json"},
-          body: json.encode({
+        final registerResponse = await _postJson(
+          "auth/register",
+          {
             "name": registerName,
             "email": email,
             "password": password,
-          }),
+          },
         );
 
         if (registerResponse.statusCode != 201) {
-          final body = json.decode(registerResponse.body);
-          final message = (body["message"] ?? "Registration failed").toString();
+          final message = _extractApiMessage(
+            registerResponse,
+            "Registration failed",
+          );
           setState(() {
             if (message.toLowerCase().contains("email")) {
               registerEmailError = message;
@@ -297,16 +340,23 @@ class _AuthScreenState extends State<AuthScreen> {
         }
       }
 
-      final loginResponse = await http.post(
-        Uri.parse("${ApiConfig.baseUrl}/auth/login"),
-        headers: {"Content-Type": "application/json"},
-        body: json.encode({"email": email, "password": password}),
+      final loginResponse = await _postJson(
+        "auth/login",
+        {"email": email, "password": password},
       );
 
       if (loginResponse.statusCode == 200) {
-        final body = json.decode(loginResponse.body);
-        final token = body["data"]?["token"];
-        final apiName = (body["data"]?["user"]?["name"] ?? "").toString().trim();
+        final body = _tryDecodeBody(loginResponse.body);
+        final data = body["data"];
+        final dataMap = data is Map<String, dynamic>
+            ? data
+            : const <String, dynamic>{};
+        final user = dataMap["user"];
+        final userMap = user is Map<String, dynamic>
+            ? user
+            : const <String, dynamic>{};
+        final token = dataMap["token"];
+        final apiName = (userMap["name"] ?? "").toString().trim();
         final fallbackName = isRegister
             ? registerName
             : email.split("@").first.trim();
@@ -324,8 +374,7 @@ class _AuthScreenState extends State<AuthScreen> {
           });
         }
       } else {
-        final body = json.decode(loginResponse.body);
-        final message = (body["message"] ?? "Sign in failed").toString();
+        final message = _extractApiMessage(loginResponse, "Sign in failed");
         setState(() {
           if (isRegister) {
             registerGeneralError = message;
@@ -341,6 +390,14 @@ class _AuthScreenState extends State<AuthScreen> {
           }
         });
       }
+    } on TimeoutException {
+      setState(() {
+        if (isRegister) {
+          registerGeneralError = "Request timed out. Please try again.";
+        } else {
+          loginGeneralError = "Request timed out. Please try again.";
+        }
+      });
     } catch (_) {
       setState(() {
         if (isRegister) {
@@ -382,6 +439,8 @@ class _AuthScreenState extends State<AuthScreen> {
         if (isRegister) ...[
           TextField(
             controller: registerNameController,
+            textInputAction: TextInputAction.next,
+            autofillHints: const [AutofillHints.name],
             onChanged: (_) {
               if (registerNameError != null || registerGeneralError != null) {
                 setState(() {
@@ -392,7 +451,7 @@ class _AuthScreenState extends State<AuthScreen> {
             },
             decoration: InputDecoration(
               labelText: "Name",
-              prefixIcon: Icon(Icons.person_outline),
+              prefixIcon: const Icon(Icons.person_outline),
               errorText: registerNameError,
             ),
           ),
@@ -401,6 +460,8 @@ class _AuthScreenState extends State<AuthScreen> {
         TextField(
           controller: emailController,
           keyboardType: TextInputType.emailAddress,
+          textInputAction: TextInputAction.next,
+          autofillHints: const [AutofillHints.email],
           onChanged: (_) {
             setState(() {
               if (isRegister) {
@@ -422,6 +483,15 @@ class _AuthScreenState extends State<AuthScreen> {
         TextField(
           controller: passwordController,
           obscureText: true,
+          textInputAction: isRegister ? TextInputAction.next : TextInputAction.done,
+          autofillHints: isRegister
+              ? const [AutofillHints.newPassword]
+              : const [AutofillHints.password],
+          onSubmitted: (_) {
+            if (!isRegister) {
+              submit(isRegister: false);
+            }
+          },
           onChanged: (_) {
             setState(() {
               if (isRegister) {
@@ -444,6 +514,9 @@ class _AuthScreenState extends State<AuthScreen> {
           TextField(
             controller: registerConfirmPasswordController,
             obscureText: true,
+            textInputAction: TextInputAction.done,
+            autofillHints: const [AutofillHints.newPassword],
+            onSubmitted: (_) => submit(isRegister: true),
             onChanged: (_) {
               if (registerConfirmPasswordError != null ||
                   registerGeneralError != null) {
@@ -1589,7 +1662,7 @@ class _TaskScreenState extends State<TaskScreen> {
     final date = task.date.trim();
     final time = task.time.trim();
     if (date.isEmpty || time.isEmpty) return null;
-    return DateTime.tryParse("${date}T${time}:00");
+    return DateTime.tryParse("${date}T$time:00");
   }
 
   List<Task> get visibleTasks {

@@ -6,7 +6,7 @@ void main() {
   testWidgets('App loads auth screen', (WidgetTester tester) async {
     await tester.pumpWidget(const SmartTimeManagerApp());
 
-    expect(find.text('Smart Time Manager'), findsOneWidget);
-    expect(find.text('Login'), findsWidgets);
+    expect(find.text('Smart Task Manager'), findsOneWidget);
+    expect(find.text('Sign in'), findsWidgets);
   });
 }
