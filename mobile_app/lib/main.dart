@@ -5,6 +5,7 @@ import "dart:io";
 import "package:flutter/material.dart";
 import "package:http/http.dart" as http;
 import "package:image_picker/image_picker.dart";
+import "package:shared_preferences/shared_preferences.dart";
 
 void main() {
   runApp(const SmartTimeManagerApp());
@@ -21,21 +22,62 @@ class _SmartTimeManagerAppState extends State<SmartTimeManagerApp> {
   String? token;
   String? signedInEmail;
   String? signedInName;
+  bool isInitialized = false;
 
-  void onLoggedIn(String newToken, String email, String name) {
-    setState(() {
-      token = newToken;
-      signedInEmail = email;
-      signedInName = name;
-    });
+  @override
+  void initState() {
+    super.initState();
+    _restoreAuthState();
   }
 
-  void onLogout() {
-    setState(() {
-      token = null;
-      signedInEmail = null;
-      signedInName = null;
-    });
+  Future<void> _restoreAuthState() async {
+    final prefs = await SharedPreferences.getInstance();
+    final savedToken = prefs.getString('auth_token');
+    final savedEmail = prefs.getString('auth_email');
+    final savedName = prefs.getString('auth_name');
+
+    if (savedToken != null && savedToken.isNotEmpty) {
+      setState(() {
+        token = savedToken;
+        signedInEmail = savedEmail;
+        signedInName = savedName;
+        isInitialized = true;
+      });
+    } else {
+      setState(() {
+        isInitialized = true;
+      });
+    }
+  }
+
+  Future<void> onLoggedIn(String newToken, String email, String name) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('auth_token', newToken);
+    await prefs.setString('auth_email', email);
+    await prefs.setString('auth_name', name);
+
+    if (mounted) {
+      setState(() {
+        token = newToken;
+        signedInEmail = email;
+        signedInName = name;
+      });
+    }
+  }
+
+  Future<void> onLogout() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('auth_token');
+    await prefs.remove('auth_email');
+    await prefs.remove('auth_name');
+
+    if (mounted) {
+      setState(() {
+        token = null;
+        signedInEmail = null;
+        signedInName = null;
+      });
+    }
   }
 
   @override
@@ -60,14 +102,18 @@ class _SmartTimeManagerAppState extends State<SmartTimeManagerApp> {
           ),
         ),
       ),
-      home: token == null
-          ? AuthScreen(onLoggedIn: onLoggedIn)
-          : TaskScreen(
-              token: token!,
-              onLogout: onLogout,
-              signedInEmail: signedInEmail ?? "user@example.com",
-              signedInName: signedInName ?? "User",
-            ),
+      home: !isInitialized
+          ? const Scaffold(
+              body: Center(child: CircularProgressIndicator()),
+            )
+          : token == null
+              ? AuthScreen(onLoggedIn: onLoggedIn)
+              : TaskScreen(
+                  token: token!,
+                  onLogout: onLogout,
+                  signedInEmail: signedInEmail ?? "user@example.com",
+                  signedInName: signedInName ?? "User",
+                ),
     );
   }
 }
