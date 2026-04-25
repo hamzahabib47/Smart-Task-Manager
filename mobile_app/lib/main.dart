@@ -1783,27 +1783,36 @@ class _TaskScreenState extends State<TaskScreen> {
     required Widget child,
   }) {
     return Card(
-      elevation: 0,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      elevation: 2,
+      color: Colors.white,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+      shadowColor: Colors.black.withValues(alpha: 0.08),
       child: Padding(
-        padding: const EdgeInsets.all(14),
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Row(
               children: [
-                Icon(icon, size: 18),
-                const SizedBox(width: 8),
+                Container(
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE8F6F3),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  padding: const EdgeInsets.all(10),
+                  child: Icon(icon, size: 18, color: const Color(0xFF0D9488)),
+                ),
+                const SizedBox(width: 12),
                 Text(
                   title,
                   style: const TextStyle(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 16,
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 14),
             child,
           ],
         ),
@@ -2356,14 +2365,22 @@ class _TaskScreenState extends State<TaskScreen> {
               children: [
                 TextField(
                   controller: titleController,
-                  decoration: const InputDecoration(labelText: "Task title"),
+                  decoration: const InputDecoration(
+                    labelText: "Task title",
+                    prefixIcon: Icon(Icons.task_alt),
+                  ),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 10),
                 TextField(
                   controller: descriptionController,
-                  decoration: const InputDecoration(labelText: "Description"),
+                  minLines: 1,
+                  maxLines: 3,
+                  decoration: const InputDecoration(
+                    labelText: "Description",
+                    prefixIcon: Icon(Icons.notes_outlined),
+                  ),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 10),
                 Row(
                   children: [
                     Expanded(
@@ -2373,11 +2390,11 @@ class _TaskScreenState extends State<TaskScreen> {
                         onTap: pickTaskDate,
                         decoration: const InputDecoration(
                           labelText: "Date",
-                          suffixIcon: Icon(Icons.calendar_today),
+                          prefixIcon: Icon(Icons.calendar_today),
                         ),
                       ),
                     ),
-                    const SizedBox(width: 8),
+                    const SizedBox(width: 10),
                     Expanded(
                       child: TextField(
                         controller: timeController,
@@ -2385,18 +2402,24 @@ class _TaskScreenState extends State<TaskScreen> {
                         onTap: pickTaskTime,
                         decoration: const InputDecoration(
                           labelText: "Time",
-                          suffixIcon: Icon(Icons.access_time),
+                          prefixIcon: Icon(Icons.access_time),
                         ),
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 12),
                 SizedBox(
                   width: double.infinity,
-                  child: FilledButton(
+                  child: FilledButton.icon(
                     onPressed: addTask,
-                    child: const Text("Add Task"),
+                    icon: const Icon(Icons.add_task),
+                    label: const Text("Add Task"),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFF0D9488),
+                      foregroundColor: Colors.white,
+                      minimumSize: const Size.fromHeight(48),
+                    ),
                   ),
                 ),
               ],
@@ -2457,117 +2480,142 @@ class _TaskScreenState extends State<TaskScreen> {
                             padding: EdgeInsets.all(14),
                             child: Text("No tasks available"),
                           )
-                        : ListView.builder(
-                            shrinkWrap: true,
-                            physics: const NeverScrollableScrollPhysics(),
-                            itemCount: visibleTasks.length,
-                            itemBuilder: (context, index) {
-                              final task = visibleTasks[index];
+                        : Column(
+                            children: visibleTasks.map((task) {
                               final timeLine =
                                   "${task.date} ${formatTimeByPreference(task.time)}";
                               final description = task.description.trim();
                               final subtitleText = description.isEmpty
                                   ? timeLine
                                   : "$timeLine\n$description";
+                              final statusText = task.archived
+                                  ? "Archived"
+                                  : task.completed
+                                      ? "Completed"
+                                      : "Upcoming";
+                              final statusColor = task.archived
+                                  ? Colors.grey
+                                  : task.completed
+                                      ? const Color(0xFF256D35)
+                                      : const Color(0xFF0D9488);
 
-                              final actionButtons = [
-                                IconButton(
-                                  onPressed: () => editTask(task),
-                                  icon: const Icon(Icons.edit),
-                                  tooltip: "Edit",
-                                ),
-                                IconButton(
-                                  onPressed: task.completed
-                                      ? null
-                                      : () => completeTask(task.id),
-                                  icon: const Icon(Icons.check),
-                                  tooltip: "Complete",
-                                ),
-                                IconButton(
-                                  onPressed: task.archived
-                                      ? null
-                                      : () => archiveTask(task.id),
-                                  icon: const Icon(Icons.archive),
-                                  tooltip: "Archive",
-                                ),
-                                IconButton(
-                                  onPressed: task.completed
-                                      ? null
-                                      : () => dismissTask(task.id),
-                                  icon: const Icon(Icons.notifications_off),
-                                  tooltip: "Dismiss",
-                                ),
-                                IconButton(
-                                  onPressed: () => deleteTask(task.id),
-                                  icon: const Icon(Icons.delete),
-                                  tooltip: "Delete",
-                                ),
-                              ];
+                              Widget iconButton(
+                                IconData icon,
+                                String tooltip,
+                                VoidCallback? onPressed,
+                              ) {
+                                return IconButton(
+                                  padding: const EdgeInsets.all(8),
+                                  constraints: const BoxConstraints(),
+                                  onPressed: onPressed,
+                                  icon: Icon(icon,
+                                      size: 20,
+                                      color: onPressed == null
+                                          ? Colors.grey.shade400
+                                          : const Color(0xFF0D9488)),
+                                  tooltip: tooltip,
+                                );
+                              }
 
                               return Card(
-                                child: LayoutBuilder(
-                                  builder: (context, constraints) {
-                                    final isNarrow = constraints.maxWidth < 560;
-
-                                    if (!isNarrow) {
-                                      return ListTile(
-                                        title: Text(
-                                          task.title,
-                                          maxLines: 2,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: TextStyle(
-                                            decoration: task.completed
-                                                ? TextDecoration.lineThrough
-                                                : TextDecoration.none,
-                                          ),
-                                        ),
-                                        subtitle: Text(subtitleText),
-                                        isThreeLine: true,
-                                        trailing: Wrap(
-                                          spacing: 2,
-                                          children: actionButtons,
-                                        ),
-                                      );
-                                    }
-
-                                    return Padding(
-                                      padding: const EdgeInsets.fromLTRB(12, 10, 8, 8),
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                elevation: 1,
+                                margin:
+                                    const EdgeInsets.symmetric(vertical: 8),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(18),
+                                ),
+                                child: Padding(
+                                  padding: const EdgeInsets.all(16),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.stretch,
+                                    children: [
+                                      Row(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
                                         children: [
-                                          Text(
-                                            task.title,
-                                            maxLines: 2,
-                                            overflow: TextOverflow.ellipsis,
-                                            style: TextStyle(
-                                              fontWeight: FontWeight.w600,
-                                              decoration: task.completed
-                                                  ? TextDecoration.lineThrough
-                                                  : TextDecoration.none,
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: [
+                                                Text(
+                                                  task.title,
+                                                  maxLines: 2,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                  style: TextStyle(
+                                                    fontSize: 17,
+                                                    fontWeight: FontWeight.w700,
+                                                    decoration: task.completed
+                                                        ? TextDecoration
+                                                            .lineThrough
+                                                        : TextDecoration.none,
+                                                  ),
+                                                ),
+                                                const SizedBox(height: 8),
+                                                Text(
+                                                  subtitleText,
+                                                  maxLines: 4,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                  style: TextStyle(
+                                                    color: Colors.grey.shade700,
+                                                    height: 1.4,
+                                                  ),
+                                                ),
+                                              ],
                                             ),
                                           ),
-                                          const SizedBox(height: 4),
-                                          Text(
-                                            subtitleText,
-                                            maxLines: 4,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                          const SizedBox(height: 6),
-                                          Align(
-                                            alignment: Alignment.centerRight,
-                                            child: Wrap(
-                                              spacing: 2,
-                                              runSpacing: 2,
-                                              children: actionButtons,
+                                          const SizedBox(width: 10),
+                                          Chip(
+                                            label: Text(statusText),
+                                            backgroundColor: statusColor.withValues(alpha: 0.12),
+                                            labelStyle: TextStyle(
+                                              color: statusColor,
+                                              fontWeight: FontWeight.w600,
                                             ),
                                           ),
                                         ],
                                       ),
-                                    );
-                                  },
+                                      const SizedBox(height: 16),
+                                      Wrap(
+                                        spacing: 0,
+                                        runSpacing: 0,
+                                        alignment: WrapAlignment.end,
+                                        children: [
+                                          iconButton(Icons.edit, "Edit",
+                                              () => editTask(task)),
+                                          iconButton(
+                                            Icons.check_circle,
+                                            "Complete",
+                                            task.completed
+                                                ? null
+                                                : () => completeTask(task.id),
+                                          ),
+                                          iconButton(
+                                            Icons.archive,
+                                            "Archive",
+                                            task.archived
+                                                ? null
+                                                : () => archiveTask(task.id),
+                                          ),
+                                          iconButton(
+                                            Icons.notifications_off,
+                                            "Dismiss",
+                                            task.completed
+                                                ? null
+                                                : () => dismissTask(task.id),
+                                          ),
+                                          iconButton(Icons.delete, "Delete",
+                                              () => deleteTask(task.id)),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               );
-                            },
+                            }).toList(),
                           ),
               ],
             ),
