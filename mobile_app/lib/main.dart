@@ -411,7 +411,7 @@ class _AuthScreenState extends State<AuthScreen> {
           headers: {"Content-Type": "application/json"},
           body: json.encode(payload),
         )
-        .timeout(const Duration(seconds: 20));
+        .timeout(const Duration(seconds: 30));
   }
 
   void clearAuthErrors({required bool isRegister}) {
@@ -1062,7 +1062,7 @@ class _TaskScreenState extends State<TaskScreen> {
     try {
       final response = await http.get(
         Uri.parse("${ApiConfig.baseUrl}/tasks/public/display-state"),
-      );
+      ).timeout(const Duration(seconds: 30));
 
       if (response.statusCode != 200) return;
 
@@ -1719,7 +1719,7 @@ class _TaskScreenState extends State<TaskScreen> {
           "${ApiConfig.baseUrl}/tasks?archived=${isArchivedView ? "true" : "false"}",
         ),
         headers: authHeaders,
-      );
+      ).timeout(const Duration(seconds: 30));
 
       if (response.statusCode == 200) {
         final body = json.decode(response.body);
