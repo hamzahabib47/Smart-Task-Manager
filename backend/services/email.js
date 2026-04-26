@@ -5,6 +5,7 @@ const smtpPort = Number(process.env.SMTP_PORT || 587);
 const smtpUser = process.env.SMTP_USER || "";
 const smtpPass = process.env.SMTP_PASS || "";
 const smtpSecure = (process.env.SMTP_SECURE || "false").toLowerCase() === "true";
+const smtpService = process.env.SMTP_SERVICE || "";
 const mailFrom = process.env.MAIL_FROM || smtpUser || "no-reply@smarttaskmanager.app";
 
 let transporter = null;
@@ -18,7 +19,7 @@ const getTransporter = () => {
   }
 
   if (!transporter) {
-    transporter = nodemailer.createTransport({
+    const transportOptions = {
       host: smtpHost,
       port: smtpPort,
       secure: smtpSecure,
@@ -26,6 +27,33 @@ const getTransporter = () => {
         user: smtpUser,
         pass: smtpPass,
       },
+      authMethod: "LOGIN",
+      logger: false,
+      debug: false,
+      connectionTimeout: 10000,
+      greetingTimeout: 10000,
+      socketTimeout: 10000,
+      tls: {
+        rejectUnauthorized: false,
+      },
+    };
+
+    if (smtpService) {
+      transportOptions.service = smtpService;
+    }
+
+    if (!smtpSecure) {
+      transportOptions.requireTLS = true;
+    }
+
+    transporter = nodemailer.createTransport(transportOptions);
+
+    transporter.verify((error, success) => {
+      if (error) {
+        console.error("SMTP transporter verification failed:", error.message);
+      } else {
+        console.log("SMTP transporter verified successfully");
+      }
     });
   }
 
