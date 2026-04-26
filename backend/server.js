@@ -3,8 +3,6 @@ const fs = require("fs");
 const express = require("express");
 const cors = require("cors");
 const dotenv = require("dotenv");
-const http = require("http");
-const { Server } = require("socket.io");
 const { EventEmitter } = require("events");
 
 const connectDB = require("./config/db");
@@ -14,12 +12,20 @@ const settingsRoutes = require("./routes/settings");
 const deviceRoutes = require("./routes/device");
 const alarmRoutes = require("./routes/alarms");
 const taskRoutes = require("./routes/tasks");
-const {
-  startDailySummaryScheduler,
-} = require("./services/dailySummaryScheduler");
 
 dotenv.config();
 const isVercelRuntime = process.env.VERCEL === "1";
+
+// Only require these on local development
+let http, Server;
+if (!isVercelRuntime) {
+  http = require("http");
+  Server = require("socket.io").Server;
+}
+
+const {
+  startDailySummaryScheduler,
+} = require("./services/dailySummaryScheduler");
 
 if (!process.env.JWT_SECRET) {
   const msg = "JWT_SECRET is required";
@@ -38,6 +44,7 @@ const app = express();
 // Global event emitter for real-time updates (works on Vercel)
 const updateEmitter = new EventEmitter();
 app.locals.updateEmitter = updateEmitter;
+app.locals.io = null; // Will be set to Socket.IO instance on local development
 
 app.use(cors());
 app.use(express.json());
