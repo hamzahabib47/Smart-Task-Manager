@@ -4,6 +4,11 @@ const path = require("path");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
+const {
+  isEmailConfigured,
+  sendVerificationCodeEmail,
+  sendPasswordResetCodeEmail,
+} = require("../services/email");
 
 const authMiddleware = require("../middleware/auth");
 const Alarm = require("../models/Alarm");
@@ -13,6 +18,15 @@ const Task = require("../models/Task");
 const User = require("../models/User");
 
 const router = express.Router();
+
+const VERIFICATION_CODE_MINUTES = 10;
+const PASSWORD_RESET_CODE_MINUTES = 15;
+
+const createNumericCode = () =>
+  String(Math.floor(100000 + Math.random() * 900000));
+
+const hashCode = (code) =>
+  crypto.createHash("sha256").update(code).digest("hex");
 
 const isDbUnavailableError = (error) => {
   const msg = (error?.message || "").toLowerCase();
@@ -24,7 +38,7 @@ const isDbUnavailableError = (error) => {
   );
 };
 
-router.post("/auth/register", async (req, res) => {
+const handleRegisterRequest = async (req, res) => {
   try {
     const name = (req.body.name || "").trim();
     const email = (req.body.email || "").trim().toLowerCase();
@@ -45,7 +59,7 @@ router.post("/auth/register", async (req, res) => {
     }
 
     const exists = await User.findOne({ email });
-    if (exists) {
+    if (exists && exists.isEmailVerified) {
       return res.status(409).json({
         success: false,
         message: "Email already registered",
@@ -53,14 +67,123 @@ router.post("/auth/register", async (req, res) => {
     }
 
     const passwordHash = await bcrypt.hash(password, 10);
-    const user = await User.create({ name, email, passwordHash });
+    const verificationCode = createNumericCode();
+    const verificationCodeHash = hashCode(verificationCode);
+    const verificationCodeExpiry = new Date(
+      Date.now() + VERIFICATION_CODE_MINUTES * 60 * 1000
+    );
 
-    return res.status(201).json({
+    let user = exists;
+    if (!user) {
+      user = await User.create({
+        name,
+        email,
+        passwordHash,
+        isEmailVerified: false,
+        emailVerificationCodeHash: verificationCodeHash,
+        emailVerificationCodeExpiry: verificationCodeExpiry,
+      });
+    } else {
+      user.name = name;
+      user.passwordHash = passwordHash;
+      user.isEmailVerified = false;
+      user.emailVerificationCodeHash = verificationCodeHash;
+      user.emailVerificationCodeExpiry = verificationCodeExpiry;
+      await user.save();
+    }
+
+    if (!isEmailConfigured()) {
+      return res.status(503).json({
+        success: false,
+        message: "Email service is not configured. Please contact support.",
+      });
+    }
+
+    await sendVerificationCodeEmail({
+      to: email,
+      name,
+      code: verificationCode,
+    });
+
+    return res.status(202).json({
       success: true,
-      message: "Registration successful",
+      message: "Verification code sent to your email",
       data: {
-        id: user._id,
-        name: user.name,
+        email,
+        expiresInMinutes: VERIFICATION_CODE_MINUTES,
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Server error",
+      error: error.message,
+    });
+  }
+};
+
+router.post("/auth/register-request", handleRegisterRequest);
+
+// Backward-compatible alias for older clients
+router.post("/auth/register", handleRegisterRequest);
+
+router.post("/auth/verify-email", async (req, res) => {
+  try {
+    const email = (req.body.email || "").trim().toLowerCase();
+    const code = (req.body.code || "").trim();
+
+    if (!email || !code) {
+      return res.status(400).json({
+        success: false,
+        message: "email and verification code are required",
+      });
+    }
+
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "No account found for this email",
+      });
+    }
+
+    if (user.isEmailVerified) {
+      return res.json({
+        success: true,
+        message: "Email already verified",
+      });
+    }
+
+    if (!user.emailVerificationCodeHash || !user.emailVerificationCodeExpiry) {
+      return res.status(400).json({
+        success: false,
+        message: "Verification code not found. Please request a new code.",
+      });
+    }
+
+    if (user.emailVerificationCodeExpiry < new Date()) {
+      return res.status(400).json({
+        success: false,
+        message: "Verification code has expired. Please request a new code.",
+      });
+    }
+
+    if (hashCode(code) !== user.emailVerificationCodeHash) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid verification code",
+      });
+    }
+
+    user.isEmailVerified = true;
+    user.emailVerificationCodeHash = null;
+    user.emailVerificationCodeExpiry = null;
+    await user.save();
+
+    return res.json({
+      success: true,
+      message: "Email verified successfully",
+      data: {
         email: user.email,
       },
     });
@@ -98,6 +221,13 @@ router.post("/auth/login", async (req, res) => {
       return res.status(401).json({
         success: false,
         message: "Incorrect password",
+      });
+    }
+
+    if (!user.isEmailVerified) {
+      return res.status(403).json({
+        success: false,
+        message: "Please verify your email before signing in.",
       });
     }
 
@@ -268,28 +398,40 @@ router.post("/auth/forgot-password", async (req, res) => {
       // For security, don't reveal if email exists
       return res.status(200).json({
         success: true,
-        message: "If the email exists, a reset link will be sent.",
+        message: "If the email exists, a password reset code will be sent.",
       });
     }
 
-    // Generate a secure random token
-    const resetToken = crypto.randomBytes(32).toString("hex");
-    const resetTokenExpiry = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
+    if (!isEmailConfigured()) {
+      return res.status(503).json({
+        success: false,
+        message: "Email service is not configured. Please contact support.",
+      });
+    }
 
-    // Save token and expiry to user
-    user.resetToken = resetToken;
-    user.resetTokenExpiry = resetTokenExpiry;
+    const resetCode = createNumericCode();
+    const resetCodeHash = hashCode(resetCode);
+    const resetCodeExpiry = new Date(
+      Date.now() + PASSWORD_RESET_CODE_MINUTES * 60 * 1000
+    );
+
+    user.passwordResetCodeHash = resetCodeHash;
+    user.passwordResetCodeExpiry = resetCodeExpiry;
+    user.resetToken = null;
+    user.resetTokenExpiry = null;
     await user.save();
 
-    // For now, return the reset link in response (no email service)
-    const resetLink = `https://yourdomain.com/reset-password/${resetToken}`;
+    await sendPasswordResetCodeEmail({
+      to: user.email,
+      name: user.name,
+      code: resetCode,
+    });
 
     return res.json({
       success: true,
-      message: "Password reset link generated",
+      message: "If the email exists, a password reset code has been sent.",
       data: {
-        resetLink,
-        expiresIn: "15 minutes",
+        expiresInMinutes: PASSWORD_RESET_CODE_MINUTES,
       },
     });
   } catch (error) {
@@ -303,13 +445,15 @@ router.post("/auth/forgot-password", async (req, res) => {
 
 router.post("/auth/reset-password", async (req, res) => {
   try {
+    const email = (req.body.email || "").trim().toLowerCase();
+    const code = (req.body.code || "").trim();
     const token = (req.body.token || "").trim();
     const newPassword = req.body.newPassword || "";
 
-    if (!token) {
+    if ((!email || !code) && !token) {
       return res.status(400).json({
         success: false,
-        message: "Reset token is required",
+        message: "Provide either email+reset code or a reset token",
       });
     }
 
@@ -327,30 +471,59 @@ router.post("/auth/reset-password", async (req, res) => {
       });
     }
 
-    // Find user by reset token
-    const user = await User.findOne({ resetToken: token });
+    let user = null;
+    if (token) {
+      user = await User.findOne({ resetToken: token });
+      if (!user || !user.resetTokenExpiry || user.resetTokenExpiry < new Date()) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid or expired reset token",
+        });
+      }
+    } else {
+      user = await User.findOne({ email });
+    }
+
     if (!user) {
       return res.status(400).json({
         success: false,
-        message: "Invalid or expired reset token",
+        message: "Invalid or expired reset code",
       });
     }
 
-    // Check if token is expired
-    if (user.resetTokenExpiry < new Date()) {
-      return res.status(400).json({
-        success: false,
-        message: "Reset token has expired",
-      });
+    if (!token) {
+      if (!user.passwordResetCodeHash || !user.passwordResetCodeExpiry) {
+        return res.status(400).json({
+          success: false,
+          message: "Reset code not found. Please request a new one.",
+        });
+      }
+
+      if (user.passwordResetCodeExpiry < new Date()) {
+        return res.status(400).json({
+          success: false,
+          message: "Reset code has expired",
+        });
+      }
+
+      if (hashCode(code) !== user.passwordResetCodeHash) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid or expired reset code",
+        });
+      }
     }
 
     // Hash the new password
     const passwordHash = await bcrypt.hash(newPassword, 10);
 
-    // Update user password and clear reset token
+    // Update user password and clear reset metadata
     user.passwordHash = passwordHash;
+    user.isEmailVerified = true;
     user.resetToken = null;
     user.resetTokenExpiry = null;
+    user.passwordResetCodeHash = null;
+    user.passwordResetCodeExpiry = null;
     await user.save();
 
     return res.json({
