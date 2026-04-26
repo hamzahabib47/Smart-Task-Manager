@@ -1,6 +1,5 @@
 import "dart:async";
 import "dart:convert";
-import "dart:io";
 import "dart:math";
 
 import "package:flutter/material.dart";
@@ -591,7 +590,7 @@ class _AuthScreenState extends State<AuthScreen> {
           loginGeneralError = "Request timed out. Please try again.";
         }
       });
-    } on SocketException {
+    } on Exception {
       setState(() {
         if (isRegister) {
           registerGeneralError = "No internet connection or server unreachable.";
@@ -3460,7 +3459,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     } on TimeoutException {
       setState(() =>
           emailError = "Request timed out. Please try again.");
-    } on SocketException {
+    } on Exception {
       setState(() =>
           emailError = "No internet connection or server unreachable.");
     } catch (_) {
@@ -3714,7 +3713,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
     } on TimeoutException {
       setState(() =>
           generalError = "Request timed out. Please try again.");
-    } on SocketException {
+    } on Exception {
       setState(() =>
           generalError = "No internet connection or server unreachable.");
     } catch (_) {

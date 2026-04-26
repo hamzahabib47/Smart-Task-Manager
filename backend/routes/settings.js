@@ -4,6 +4,23 @@ const authMiddleware = require("../middleware/auth");
 const Setting = require("../models/Setting");
 
 const router = express.Router();
+
+// Helper function to emit updates to both Socket.IO and SSE
+const emitUpdate = (req, data) => {
+  const io = req.app.locals.io;
+  const updateEmitter = req.app.locals.updateEmitter;
+  
+  // Emit to Socket.IO (for local development)
+  if (io) {
+    io.emit("dataUpdated", data);
+  }
+  
+  // Emit to EventEmitter for SSE (works on Vercel)
+  if (updateEmitter) {
+    updateEmitter.emit("dataUpdated", data);
+  }
+};
+
 const isValidHHMM = (value) => /^([01]?\d|2[0-3]):([0-5]\d)$/.test((value || "").trim());
 
 router.get("/settings/public", async (_req, res) => {
@@ -214,11 +231,8 @@ router.put("/settings", async (req, res) => {
       { new: true, upsert: true, setDefaultsOnInsert: true }
     );
 
-    // Emit WebSocket event for real-time update
-    const io = req.app.locals.io;
-    if (io) {
-      io.emit("dataUpdated", { type: "settings", action: "updated", data: setting });
-    }
+    // Emit real-time update event
+    emitUpdate(req, { type: \"settings\", action: \"updated\", data: setting });
 
     return res.json({
       success: true,

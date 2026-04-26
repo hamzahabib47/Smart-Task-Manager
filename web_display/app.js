@@ -4,46 +4,42 @@ const DISMISS_TASK_ENDPOINT = `${API_BASE_URL}/api/tasks/public`;
 const STOP_ALARM_ENDPOINT = `${API_BASE_URL}/api/alarms/public`;
 const ALARM_VOLUME = 0.22;
 
-// Socket.IO connection for real-time updates
-let socket = null;
+// Server-Sent Events for real-time updates
+let eventSource = null;
 let pollingFallbackTimer = null;
 
-function initializeSocketConnection() {
+function initializeRealTimeUpdates() {
   try {
-    // Import Socket.IO client library
-    const script = document.createElement("script");
-    script.src = `${API_BASE_URL}/socket.io/socket.io.js`;
-    script.onload = () => {
-      socket = io(API_BASE_URL, {
-        reconnection: true,
-        reconnectionDelay: 1000,
-        reconnectionDelayMax: 5000,
-        reconnectionAttempts: 5,
-      });
+    // Connect to SSE endpoint for real-time updates
+    eventSource = new EventSource(`${API_BASE_URL}/api/updates/subscribe`);
 
-      socket.on("connect", () => {
-        console.log("Connected to WebSocket server");
-        clearInterval(pollingFallbackTimer);
-      });
-
-      socket.on("dataUpdated", (data) => {
-        console.log("Data updated via WebSocket:", data);
-        loadDisplayState();
-      });
-
-      socket.on("disconnect", () => {
-        console.log("Disconnected from WebSocket server, using polling fallback");
-        // Fallback to polling if WebSocket disconnects
-        pollingFallbackTimer = setInterval(loadDisplayState, 5000);
-      });
-
-      socket.on("error", (error) => {
-        console.error("WebSocket error:", error);
-      });
+    eventSource.onopen = () => {
+      console.log("Connected to real-time update stream");
+      clearInterval(pollingFallbackTimer);
     };
-    document.head.appendChild(script);
+
+    eventSource.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (data && data.connected) {
+          console.log("Real-time update stream connected");
+          return;
+        }
+        console.log("Data updated via SSE:", data);
+        loadDisplayState();
+      } catch (error) {
+        console.error("Error parsing SSE message:", error);
+      }
+    };
+
+    eventSource.onerror = (error) => {
+      console.error("SSE connection error:", error);
+      eventSource.close();
+      // Fallback to polling if SSE fails
+      pollingFallbackTimer = setInterval(loadDisplayState, 5000);
+    };
   } catch (error) {
-    console.error("Failed to initialize Socket.IO:", error);
+    console.error("Failed to initialize real-time updates:", error);
     // Fallback to polling
     pollingFallbackTimer = setInterval(loadDisplayState, 5000);
   }
@@ -575,5 +571,5 @@ document.addEventListener(
 
 startClock();
 ensureCountdownTimer();
-initializeSocketConnection();
+initializeRealTimeUpdates();
 loadDisplayState();

@@ -6,6 +6,22 @@ const authMiddleware = require("../middleware/auth");
 
 const router = express.Router();
 
+// Helper function to emit updates to both Socket.IO and SSE
+const emitUpdate = (req, data) => {
+  const io = req.app.locals.io;
+  const updateEmitter = req.app.locals.updateEmitter;
+  
+  // Emit to Socket.IO (for local development)
+  if (io) {
+    io.emit("dataUpdated", data);
+  }
+  
+  // Emit to EventEmitter for SSE (works on Vercel)
+  if (updateEmitter) {
+    updateEmitter.emit("dataUpdated", data);
+  }
+};
+
 const isValidTime = (value) => /^([01]?\d|2[0-3]):([0-5]\d)$/.test((value || "").trim());
 
 router.patch("/alarms/public/:id/stop", async (req, res) => {
@@ -36,11 +52,8 @@ router.patch("/alarms/public/:id/stop", async (req, res) => {
       });
     }
 
-    // Emit WebSocket event for real-time update
-    const io = req.app.locals.io;
-    if (io) {
-      io.emit("dataUpdated", { type: "alarm", action: "stopped", data: alarm });
-    }
+    // Emit real-time update event
+    emitUpdate(req, { type: "alarm", action: "toggled", data: alarm });
 
     return res.json({
       success: true,
@@ -101,11 +114,8 @@ router.post("/alarms", async (req, res) => {
       recurrence,
     });
 
-    // Emit WebSocket event for real-time update
-    const io = req.app.locals.io;
-    if (io) {
-      io.emit("dataUpdated", { type: "alarm", action: "created", data: alarm });
-    }
+    // Emit real-time update event
+    emitUpdate(req, { type: "alarm", action: "created", data: alarm });
 
     return res.status(201).json({
       success: true,
@@ -166,11 +176,8 @@ router.patch("/alarms/:id/stop", async (req, res) => {
       });
     }
 
-    // Emit WebSocket event for real-time update
-    const io = req.app.locals.io;
-    if (io) {
-      io.emit("dataUpdated", { type: "alarm", action: "stopped", data: alarm });
-    }
+    // Emit real-time update event
+    emitUpdate(req, { type: "alarm", action: "stopped", data: alarm });
 
     return res.json({
       success: true,
@@ -214,11 +221,8 @@ router.patch("/alarms/:id/toggle", async (req, res) => {
       });
     }
 
-    // Emit WebSocket event for real-time update
-    const io = req.app.locals.io;
-    if (io) {
-      io.emit("dataUpdated", { type: "alarm", action: "toggled", data: alarm });
-    }
+    // Emit real-time update event
+    emitUpdate(req, { type: \"alarm\", action: \"toggled\", data: alarm });
 
     return res.json({
       success: true,
@@ -248,11 +252,8 @@ router.delete("/alarms/:id", async (req, res) => {
       });
     }
 
-    // Emit WebSocket event for real-time update
-    const io = req.app.locals.io;
-    if (io) {
-      io.emit("dataUpdated", { type: "alarm", action: "deleted", data: alarm });
-    }
+    // Emit real-time update event
+    emitUpdate(req, { type: "alarm", action: "deleted", data: alarm });
 
     return res.json({
       success: true,

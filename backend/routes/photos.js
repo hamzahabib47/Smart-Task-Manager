@@ -9,6 +9,22 @@ const Photo = require("../models/Photo");
 
 const router = express.Router();
 
+// Helper function to emit updates to both Socket.IO and SSE
+const emitUpdate = (req, data) => {
+  const io = req.app.locals.io;
+  const updateEmitter = req.app.locals.updateEmitter;
+  
+  // Emit to Socket.IO (for local development)
+  if (io) {
+    io.emit("dataUpdated", data);
+  }
+  
+  // Emit to EventEmitter for SSE (works on Vercel)
+  if (updateEmitter) {
+    updateEmitter.emit("dataUpdated", data);
+  }
+};
+
 const isVercelRuntime = process.env.VERCEL === "1";
 const uploadDir = isVercelRuntime
   ? path.join("/tmp", "uploads")
@@ -126,11 +142,8 @@ router.post("/photos/upload", (req, res) => {
         dataBase64: req.file.buffer.toString("base64"),
       });
 
-      // Emit WebSocket event for real-time update
-      const io = req.app.locals.io;
-      if (io) {
-        io.emit("dataUpdated", { type: "photo", action: "uploaded", data: photo });
-      }
+      // Emit real-time update event
+      emitUpdate(req, { type: "photo", action: "uploaded", data: photo });
 
       return res.status(201).json({
         success: true,
@@ -184,11 +197,8 @@ router.delete("/photos/:id", async (req, res) => {
       fs.unlinkSync(filePath);
     }
 
-    // Emit WebSocket event for real-time update
-    const io = req.app.locals.io;
-    if (io) {
-      io.emit("dataUpdated", { type: "photo", action: "deleted", data: photo });
-    }
+    // Emit real-time update event
+    emitUpdate(req, { type: "photo", action: "deleted", data: photo });
 
     return res.json({
       success: true,

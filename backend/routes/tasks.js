@@ -7,6 +7,22 @@ const authMiddleware = require("../middleware/auth");
 
 const router = express.Router();
 
+// Helper function to emit updates to both Socket.IO and SSE
+const emitUpdate = (req, data) => {
+  const io = req.app.locals.io;
+  const updateEmitter = req.app.locals.updateEmitter;
+  
+  // Emit to Socket.IO (for local development)
+  if (io) {
+    io.emit("dataUpdated", data);
+  }
+  
+  // Emit to EventEmitter for SSE (works on Vercel)
+  if (updateEmitter) {
+    updateEmitter.emit("dataUpdated", data);
+  }
+};
+
 const parseTaskDateTime = (dateText, timeText, timezoneOffsetMinutes = 0) => {
   const date = (dateText || "").trim();
   const time = (timeText || "").trim();
@@ -384,11 +400,8 @@ router.patch("/tasks/public/:id/dismiss", async (req, res) => {
       });
     }
 
-    // Emit WebSocket event for real-time update
-    const io = req.app.locals.io;
-    if (io) {
-      io.emit("dataUpdated", { type: "task", action: "dismissed", data: task });
-    }
+    // Emit real-time update event
+    emitUpdate(req, { type: "task", action: "dismissed", data: task });
 
     return res.json({
       success: true,
@@ -425,11 +438,8 @@ router.post("/tasks", async (req, res) => {
       time,
     });
 
-    // Emit WebSocket event for real-time update
-    const io = req.app.locals.io;
-    if (io) {
-      io.emit("dataUpdated", { type: "task", action: "created", data: task });
-    }
+    // Emit real-time update event
+    emitUpdate(req, { type: "task", action: "created", data: task });
 
     res.status(201).json({
       success: true,
@@ -491,11 +501,8 @@ router.put("/tasks/:id", async (req, res) => {
       });
     }
 
-    // Emit WebSocket event for real-time update
-    const io = req.app.locals.io;
-    if (io) {
-      io.emit("dataUpdated", { type: "task", action: "updated", data: task });
-    }
+    // Emit real-time update event
+    emitUpdate(req, { type: "task", action: "updated", data: task });
 
     return res.json({
       success: true,
@@ -525,11 +532,8 @@ router.delete("/tasks/:id", async (req, res) => {
       });
     }
 
-    // Emit WebSocket event for real-time update
-    const io = req.app.locals.io;
-    if (io) {
-      io.emit("dataUpdated", { type: "task", action: "deleted", data: task });
-    }
+    // Emit real-time update event
+    emitUpdate(req, { type: "task", action: "deleted", data: task });
 
     return res.json({
       success: true,
@@ -559,11 +563,8 @@ router.patch("/tasks/:id/complete", async (req, res) => {
       });
     }
 
-    // Emit WebSocket event for real-time update
-    const io = req.app.locals.io;
-    if (io) {
-      io.emit("dataUpdated", { type: "task", action: "completed", data: task });
-    }
+    // Emit real-time update event
+    emitUpdate(req, { type: "task", action: "completed", data: task });
 
     return res.json({
       success: true,
@@ -594,11 +595,8 @@ router.patch("/tasks/:id/archive", async (req, res) => {
       });
     }
 
-    // Emit WebSocket event for real-time update
-    const io = req.app.locals.io;
-    if (io) {
-      io.emit("dataUpdated", { type: "task", action: "archived", data: task });
-    }
+    // Emit real-time update event
+    emitUpdate(req, { type: "task", action: "archived", data: task });
 
     return res.json({
       success: true,
@@ -629,11 +627,8 @@ router.patch("/tasks/:id/dismiss", async (req, res) => {
       });
     }
 
-    // Emit WebSocket event for real-time update
-    const io = req.app.locals.io;
-    if (io) {
-      io.emit("dataUpdated", { type: "task", action: "dismissed", data: task });
-    }
+    // Emit real-time update event
+    emitUpdate(req, { type: "task", action: "dismissed", data: task });
 
     return res.json({
       success: true,
