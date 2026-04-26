@@ -1,9 +1,15 @@
-const API_BASE_URL = "https://smart-task-manager-tan.vercel.app";
+const DEFAULT_API_BASE_URL = "https://smart-task-manager-tan.vercel.app";
+const API_BASE_URL =
+  window.location.origin && window.location.origin.startsWith("http")
+    ? window.location.origin
+    : DEFAULT_API_BASE_URL;
 const DISPLAY_ENDPOINT = `${API_BASE_URL}/api/tasks/public/display-state`;
 const DISMISS_TASK_ENDPOINT = `${API_BASE_URL}/api/tasks/public`;
 const STOP_ALARM_ENDPOINT = `${API_BASE_URL}/api/alarms/public`;
 const REALTIME_CONFIG_ENDPOINT = `${API_BASE_URL}/api/realtime/config`;
 const ALARM_VOLUME = 0.22;
+
+let socketIoClient = null;
 
 // ============== PERFORMANCE OPTIMIZATION: Request Management ==============
 // Prevent duplicate concurrent requests, cache responses, and debounce rapid calls
@@ -97,6 +103,51 @@ function initializeSSEUpdates() {
   }
 }
 
+function initializeSocketIoUpdates() {
+  if (typeof io !== "function") {
+    console.warn("Socket.IO client unavailable; falling back to other realtime providers");
+    return false;
+  }
+
+  try {
+    socketIoClient = io(API_BASE_URL, {
+      transports: ["websocket", "polling"],
+      reconnectionAttempts: 5,
+    });
+
+    socketIoClient.on("connect", () => {
+      console.log("Connected to Socket.IO realtime stream");
+      stopPollingFallback();
+    });
+
+    socketIoClient.on("dataUpdated", (data) => {
+      console.log("Data updated via Socket.IO:", data);
+      stopPollingFallback();
+      debouncedLoadDisplayState();
+    });
+
+    socketIoClient.on("connect_error", (error) => {
+      console.error("Socket.IO connect error:", error);
+    });
+
+    socketIoClient.on("error", (error) => {
+      console.error("Socket.IO error:", error);
+    });
+
+    socketIoClient.on("disconnect", (reason) => {
+      console.warn("Socket.IO disconnected:", reason);
+      if (reason !== "io client disconnect") {
+        startPollingFallback();
+      }
+    });
+
+    return true;
+  } catch (error) {
+    console.error("Failed to initialize Socket.IO:", error);
+    return false;
+  }
+}
+
 function initializePusherUpdates(config) {
   if (!window.Pusher) {
     console.warn("Pusher SDK not loaded, falling back to SSE/polling");
@@ -134,6 +185,10 @@ function initializePusherUpdates(config) {
 }
 
 async function initializeRealTimeUpdates() {
+  if (initializeSocketIoUpdates()) {
+    return;
+  }
+
   try {
     const response = await fetch(REALTIME_CONFIG_ENDPOINT, {
       cache: "no-store",
