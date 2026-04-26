@@ -224,7 +224,7 @@ router.post("/auth/login", async (req, res) => {
       });
     }
 
-    if (!user.isEmailVerified) {
+    if (user.isEmailVerified === false) {
       return res.status(403).json({
         success: false,
         message: "Please verify your email before signing in.",
