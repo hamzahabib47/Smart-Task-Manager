@@ -99,11 +99,19 @@ const handleRegisterRequest = async (req, res) => {
       });
     }
 
-    await sendVerificationCodeEmail({
-      to: email,
-      name,
-      code: verificationCode,
-    });
+    try {
+      await sendVerificationCodeEmail({
+        to: email,
+        name,
+        code: verificationCode,
+      });
+    } catch (emailError) {
+      return res.status(502).json({
+        success: false,
+        message: "Unable to send verification email. Please check SMTP settings.",
+        error: emailError.message,
+      });
+    }
 
     return res.status(202).json({
       success: true,
@@ -421,11 +429,19 @@ router.post("/auth/forgot-password", async (req, res) => {
     user.resetTokenExpiry = null;
     await user.save();
 
-    await sendPasswordResetCodeEmail({
-      to: user.email,
-      name: user.name,
-      code: resetCode,
-    });
+    try {
+      await sendPasswordResetCodeEmail({
+        to: user.email,
+        name: user.name,
+        code: resetCode,
+      });
+    } catch (emailError) {
+      return res.status(502).json({
+        success: false,
+        message: "Unable to send password reset email. Please check SMTP settings.",
+        error: emailError.message,
+      });
+    }
 
     return res.json({
       success: true,
