@@ -2,27 +2,42 @@ const API_BASE_URL = "https://smart-task-manager-tan.vercel.app";
 const DISPLAY_ENDPOINT = `${API_BASE_URL}/api/tasks/public/display-state`;
 const DISMISS_TASK_ENDPOINT = `${API_BASE_URL}/api/tasks/public`;
 const STOP_ALARM_ENDPOINT = `${API_BASE_URL}/api/alarms/public`;
+const REALTIME_CONFIG_ENDPOINT = `${API_BASE_URL}/api/realtime/config`;
 const ALARM_VOLUME = 0.22;
 
-// Server-Sent Events for real-time updates
+// Real-time sources
+let pusherClient = null;
 let eventSource = null;
 let pollingFallbackTimer = null;
 
-function initializeRealTimeUpdates() {
+function startPollingFallback() {
+  if (!pollingFallbackTimer) {
+    pollingFallbackTimer = setInterval(loadDisplayState, 5000);
+    console.log("Polling fallback active (5s)");
+  }
+}
+
+function stopPollingFallback() {
+  if (pollingFallbackTimer) {
+    clearInterval(pollingFallbackTimer);
+    pollingFallbackTimer = null;
+  }
+}
+
+function initializeSSEUpdates() {
   try {
-    // Connect to SSE endpoint for real-time updates
     eventSource = new EventSource(`${API_BASE_URL}/api/updates/subscribe`);
 
     eventSource.onopen = () => {
-      console.log("Connected to real-time update stream");
-      clearInterval(pollingFallbackTimer);
+      console.log("Connected to SSE update stream");
+      stopPollingFallback();
     };
 
     eventSource.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
         if (data && data.connected) {
-          console.log("Real-time update stream connected");
+          console.log("SSE stream connected");
           return;
         }
         console.log("Data updated via SSE:", data);
@@ -35,14 +50,74 @@ function initializeRealTimeUpdates() {
     eventSource.onerror = (error) => {
       console.error("SSE connection error:", error);
       eventSource.close();
-      // Fallback to polling if SSE fails
-      pollingFallbackTimer = setInterval(loadDisplayState, 5000);
+      startPollingFallback();
     };
   } catch (error) {
-    console.error("Failed to initialize real-time updates:", error);
-    // Fallback to polling
-    pollingFallbackTimer = setInterval(loadDisplayState, 5000);
+    console.error("Failed to initialize SSE updates:", error);
+    startPollingFallback();
   }
+}
+
+function initializePusherUpdates(config) {
+  if (!window.Pusher) {
+    console.warn("Pusher SDK not loaded, falling back to SSE/polling");
+    initializeSSEUpdates();
+    return;
+  }
+
+  try {
+    pusherClient = new window.Pusher(config.key, {
+      cluster: config.cluster,
+      forceTLS: true,
+    });
+
+    const channel = pusherClient.subscribe(config.channel);
+    channel.bind(config.event, (data) => {
+      console.log("Data updated via Pusher:", data);
+      stopPollingFallback();
+      loadDisplayState();
+    });
+
+    pusherClient.connection.bind("connected", () => {
+      console.log("Connected to Pusher real-time stream");
+      stopPollingFallback();
+    });
+
+    pusherClient.connection.bind("error", (error) => {
+      console.error("Pusher connection error:", error);
+      initializeSSEUpdates();
+    });
+  } catch (error) {
+    console.error("Failed to initialize Pusher:", error);
+    initializeSSEUpdates();
+  }
+}
+
+async function initializeRealTimeUpdates() {
+  try {
+    const response = await fetch(REALTIME_CONFIG_ENDPOINT, {
+      cache: "no-store",
+    });
+
+    if (response.ok) {
+      const payload = await response.json();
+      const config = payload?.data || {};
+      const hasPusher =
+        config.provider === "pusher" &&
+        config.enabled &&
+        config.key &&
+        config.cluster;
+
+      if (hasPusher) {
+        initializePusherUpdates(config);
+        return;
+      }
+    }
+  } catch (error) {
+    console.error("Realtime config fetch failed:", error);
+  }
+
+  initializeSSEUpdates();
 }
 
 const screen = document.getElementById("screen");

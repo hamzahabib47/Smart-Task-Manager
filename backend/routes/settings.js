@@ -2,28 +2,12 @@ const express = require("express");
 
 const authMiddleware = require("../middleware/auth");
 const Setting = require("../models/Setting");
+const { broadcastUpdate } = require("../services/realtime");
 
 const router = express.Router();
 
-// Helper function to emit updates to both Socket.IO and SSE
 const emitUpdate = (req, data) => {
-  try {
-    const io = req.app.locals.io;
-    const updateEmitter = req.app.locals.updateEmitter;
-    
-    // Emit to Socket.IO (for local development)
-    if (io) {
-      io.emit("dataUpdated", data);
-    }
-    
-    // Emit to EventEmitter for SSE (local development)
-    if (updateEmitter) {
-      updateEmitter.emit("dataUpdated", data);
-    }
-  } catch (error) {
-    console.error("Error emitting update:", error);
-    // Don't crash - just log and continue
-  }
+  void broadcastUpdate(req, data);
 };
 
 const isValidHHMM = (value) => /^([01]?\d|2[0-3]):([0-5]\d)$/.test((value || "").trim());

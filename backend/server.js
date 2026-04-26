@@ -3,7 +3,6 @@ const fs = require("fs");
 const express = require("express");
 const cors = require("cors");
 const dotenv = require("dotenv");
-const { EventEmitter } = require("events");
 
 const connectDB = require("./config/db");
 const authRoutes = require("./routes/auth");
@@ -12,6 +11,7 @@ const settingsRoutes = require("./routes/settings");
 const deviceRoutes = require("./routes/device");
 const alarmRoutes = require("./routes/alarms");
 const taskRoutes = require("./routes/tasks");
+const { initializeRealtime } = require("./services/realtime");
 
 dotenv.config();
 const isVercelRuntime = process.env.VERCEL === "1";
@@ -41,10 +41,7 @@ connectDB();
 
 const app = express();
 
-// Global event emitter for real-time updates (works on Vercel)
-const updateEmitter = new EventEmitter();
-app.locals.updateEmitter = updateEmitter;
-app.locals.io = null; // Will be set to Socket.IO instance on local development
+initializeRealtime(app);
 
 app.use(cors());
 app.use(express.json());
@@ -66,15 +63,34 @@ if (!isVercelRuntime) {
     };
 
     // Listen for updates
-    updateEmitter.on("dataUpdated", handleUpdate);
+    req.app.locals.updateEmitter.on("dataUpdated", handleUpdate);
 
     // Clean up on disconnect
     req.on("close", () => {
-      updateEmitter.removeListener("dataUpdated", handleUpdate);
+      req.app.locals.updateEmitter.removeListener("dataUpdated", handleUpdate);
       res.end();
     });
   });
 }
+
+app.get("/api/realtime/config", (_req, res) => {
+  const realtime = app.locals.realtime || {
+    provider: "none",
+    enabled: false,
+  };
+
+  return res.json({
+    success: true,
+    data: {
+      provider: realtime.provider,
+      enabled: realtime.enabled,
+      key: realtime.key || "",
+      cluster: realtime.cluster || "",
+      channel: realtime.channel || "smart-task-manager",
+      event: realtime.event || "dataUpdated",
+    },
+  });
+});
 
 app.get("/", (_req, res) => {
   res.json({
@@ -116,18 +132,6 @@ app.use(
 
 app.get("/display", (_req, res) => {
   res.sendFile(path.join(displayPath, "index.html"));
-});
-
-app.get("/display/", (_req, res) => {
-  res.sendFile(path.join(displayPath, "index.html"));
-});
-
-// 404 handler
-app.use((req, res) => {
-  res.status(404).json({
-    success: false,
-    message: "Route not found",
-  });
 });
 
 // 404 handler
