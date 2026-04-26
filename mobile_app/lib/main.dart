@@ -1005,6 +1005,20 @@ class _TaskScreenState extends State<TaskScreen> {
     return "$h12:$m:$s $suffix";
   }
 
+  String _normalizeAlarmLabel(String raw) {
+    final cleaned = raw.trim().replaceAll(RegExp(r"\s+"), " ");
+    if (cleaned.isEmpty) return cleaned;
+
+    return cleaned
+        .split(" ")
+        .map((word) {
+          if (word.isEmpty) return word;
+          final lower = word.toLowerCase();
+          return "${lower[0].toUpperCase()}${lower.substring(1)}";
+        })
+        .join(" ");
+  }
+
   String _userDisplayName() {
     final rawName = currentUserName.trim();
     if (rawName.isEmpty) return "User";
@@ -1327,7 +1341,7 @@ class _TaskScreenState extends State<TaskScreen> {
   }
 
   Future<void> addAlarm() async {
-    final label = alarmLabelController.text.trim();
+    final label = _normalizeAlarmLabel(alarmLabelController.text);
     final date = alarmDateController.text.trim();
     final time = alarmTimeController.text.trim();
 
@@ -2948,45 +2962,106 @@ class _TaskScreenState extends State<TaskScreen> {
                     itemCount: alarms.length,
                     itemBuilder: (context, index) {
                       final alarm = alarms[index];
+                      final formattedLabel =
+                          _normalizeAlarmLabel(alarm.label.isEmpty ? "Alarm" : alarm.label);
+                      final datePart =
+                          alarm.recurrence == "daily" ? "Daily" : alarm.date;
+                      final timePart = formatTimeByPreference(alarm.time);
+
                       return Card(
                         color: alarm.ringing
                             ? Colors.red.shade50
                             : Colors.grey.shade50,
-                        child: ListTile(
-                          title: Text(
-                            alarm.ringing
-                                ? "${alarm.label} (RINGING)"
-                                : alarm.label,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 10,
                           ),
-                          subtitle: Text(
-                            "${alarm.recurrence == "daily" ? "Daily" : alarm.date} ${formatTimeByPreference(alarm.time)}",
-                          ),
-                          trailing: Wrap(
-                            spacing: 2,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
-                              IconButton(
-                                onPressed: alarm.ringing
-                                    ? () => stopAlarm(alarm.id)
-                                    : null,
-                                icon: const Icon(Icons.alarm_off),
-                                tooltip: "Stop",
+                              Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      alarm.ringing
+                                          ? "$formattedLabel (RINGING)"
+                                          : formattedLabel,
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 4,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: alarm.enabled
+                                          ? const Color(0x1A059669)
+                                          : const Color(0x1A6B7280),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Text(
+                                      alarm.enabled ? "Enabled" : "Disabled",
+                                      style: TextStyle(
+                                        color: alarm.enabled
+                                            ? const Color(0xFF047857)
+                                            : const Color(0xFF6B7280),
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
-                              IconButton(
-                                onPressed: () => toggleAlarm(
-                                  alarm.id,
-                                  !alarm.enabled,
+                              const SizedBox(height: 8),
+                              Text(
+                                "$datePart • $timePart",
+                                style: const TextStyle(
+                                  color: Color(0xFF6B7280),
+                                  fontWeight: FontWeight.w500,
                                 ),
-                                icon: Icon(
-                                  alarm.enabled
-                                      ? Icons.toggle_on
-                                      : Icons.toggle_off,
-                                ),
-                                tooltip: alarm.enabled ? "Disable" : "Enable",
                               ),
-                              IconButton(
-                                onPressed: () => deleteAlarm(alarm.id),
-                                icon: const Icon(Icons.delete),
-                                tooltip: "Delete",
+                              const SizedBox(height: 8),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.end,
+                                children: [
+                                  IconButton(
+                                    visualDensity: VisualDensity.compact,
+                                    onPressed: alarm.ringing
+                                        ? () => stopAlarm(alarm.id)
+                                        : null,
+                                    icon: const Icon(Icons.alarm_off),
+                                    tooltip: "Stop",
+                                  ),
+                                  IconButton(
+                                    visualDensity: VisualDensity.compact,
+                                    onPressed: () => toggleAlarm(
+                                      alarm.id,
+                                      !alarm.enabled,
+                                    ),
+                                    icon: Icon(
+                                      alarm.enabled
+                                          ? Icons.toggle_on
+                                          : Icons.toggle_off,
+                                    ),
+                                    tooltip:
+                                        alarm.enabled ? "Disable" : "Enable",
+                                  ),
+                                  IconButton(
+                                    visualDensity: VisualDensity.compact,
+                                    onPressed: () => deleteAlarm(alarm.id),
+                                    icon: const Icon(Icons.delete),
+                                    tooltip: "Delete",
+                                  ),
+                                ],
                               ),
                             ],
                           ),

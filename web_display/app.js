@@ -5,6 +5,43 @@ const STOP_ALARM_ENDPOINT = `${API_BASE_URL}/api/alarms/public`;
 const REALTIME_CONFIG_ENDPOINT = `${API_BASE_URL}/api/realtime/config`;
 const ALARM_VOLUME = 0.22;
 
+// ============== PERFORMANCE OPTIMIZATION: Request Management ==============
+// Prevent duplicate concurrent requests, cache responses, and debounce rapid calls
+let displayStateInFlight = false;
+let lastDisplayStateTimestamp = 0;
+let cachedDisplayState = null;
+const CACHE_TTL_MS = 2000; // Cache for 2 seconds
+const MIN_REQUEST_INTERVAL_MS = 1000; // Minimum 1 second between requests
+let pendingDisplayStateReload = false;
+let reloadDebounceTimer = null;
+
+function clearDisplayStateCache() {
+  cachedDisplayState = null;
+  lastDisplayStateTimestamp = 0;
+}
+
+function getValidCachedDisplayState() {
+  if (
+    cachedDisplayState &&
+    Date.now() - lastDisplayStateTimestamp < CACHE_TTL_MS
+  ) {
+    console.log("Using cached display state");
+    return cachedDisplayState;
+  }
+  return null;
+}
+
+function debouncedLoadDisplayState() {
+  if (reloadDebounceTimer) clearTimeout(reloadDebounceTimer);
+  
+  pendingDisplayStateReload = true;
+  reloadDebounceTimer = setTimeout(() => {
+    pendingDisplayStateReload = false;
+    reloadDebounceTimer = null;
+    loadDisplayState();
+  }, 300); // 300ms debounce window for rapid updates
+}
+
 // Real-time sources
 let pusherClient = null;
 let eventSource = null;
@@ -12,8 +49,9 @@ let pollingFallbackTimer = null;
 
 function startPollingFallback() {
   if (!pollingFallbackTimer) {
-    pollingFallbackTimer = setInterval(loadDisplayState, 5000);
-    console.log("Polling fallback active (5s)");
+    // Increased from 5s to 30s to reduce redundant polling
+    pollingFallbackTimer = setInterval(loadDisplayState, 30000);
+    console.log("Polling fallback active (30s)");
   }
 }
 
@@ -41,7 +79,8 @@ function initializeSSEUpdates() {
           return;
         }
         console.log("Data updated via SSE:", data);
-        loadDisplayState();
+        // Debounce rapid SSE updates to avoid request flooding
+        debouncedLoadDisplayState();
       } catch (error) {
         console.error("Error parsing SSE message:", error);
       }
@@ -75,7 +114,8 @@ function initializePusherUpdates(config) {
     channel.bind(config.event, (data) => {
       console.log("Data updated via Pusher:", data);
       stopPollingFallback();
-      loadDisplayState();
+      // Debounce rapid Pusher events
+      debouncedLoadDisplayState();
     });
 
     pusherClient.connection.bind("connected", () => {
@@ -334,6 +374,8 @@ async function dismissByContext(context) {
         },
       });
     }
+    // Clear cache after successful dismiss since server state changed
+    clearDisplayStateCache();
   } catch (_error) {
     // Keep UI responsive even if dismiss call fails.
   } finally {
@@ -360,9 +402,12 @@ function ensureCountdownTimer() {
       const [type, id] = countdownContextKey.split(":");
       clearCountdown();
       if (type && id) {
+        // Only reload after auto-dismiss completes
         await dismissByContext({ type, id });
+        // Clear cache to force fresh fetch on reload
+        clearDisplayStateCache();
+        await loadDisplayState();
       }
-      await loadDisplayState();
     }
   }, 250);
 }
@@ -431,6 +476,36 @@ function applySlideshowData(result) {
 }
 
 async function loadDisplayState() {
+  // Request deduplication: prevent concurrent requests
+  if (displayStateInFlight) {
+    console.log("Display state request already in flight, skipping");
+    return;
+  }
+
+  // Rate limiting: ensure minimum interval between requests
+  const timeSinceLastRequest = Date.now() - lastDisplayStateTimestamp;
+  if (timeSinceLastRequest < MIN_REQUEST_INTERVAL_MS) {
+    console.log("Too soon since last request, using cache or deferring");
+    const cached = getValidCachedDisplayState();
+    if (cached) {
+      return; // Serve from cache silently
+    }
+    // Defer the request
+    if (!pendingDisplayStateReload) {
+      debouncedLoadDisplayState();
+    }
+    return;
+  }
+
+  // Try to use cached response if available
+  const cachedResult = getValidCachedDisplayState();
+  if (cachedResult) {
+    console.log("Serving from cache");
+    await renderDisplayState(cachedResult);
+    return;
+  }
+
+  displayStateInFlight = true;
   try {
     const endpoint = `${DISPLAY_ENDPOINT}?t=${Date.now()}`;
     const res = await fetch(endpoint, {
@@ -440,8 +515,27 @@ async function loadDisplayState() {
         Pragma: "no-cache",
       },
     });
+    
     const result = await res.json();
+    
+    // Cache the successful response
+    cachedDisplayState = result;
+    lastDisplayStateTimestamp = Date.now();
+    
+    await renderDisplayState(result);
+  } catch (error) {
+    console.error("Error loading display state:", error);
+    renderDisplayState({
+      success: false,
+      mode: "error",
+    });
+  } finally {
+    displayStateInFlight = false;
+  }
+}
 
+async function renderDisplayState(result) {
+  try {
     if (!result.success) {
       setEmptyDisplayMessageVisible(true);
       setCardCompact(true);
@@ -619,6 +713,7 @@ async function loadDisplayState() {
     stopAlarmSound();
     setHeroImage(firstSlide);
   } catch (error) {
+    console.error("Error rendering display state:", error);
     setEmptyDisplayMessageVisible(true);
     setCardCompact(true);
     primaryText.textContent = "NO UPCOMING TASK";

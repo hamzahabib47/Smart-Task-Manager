@@ -5,10 +5,23 @@ const Setting = require("../models/Setting");
 const Task = require("../models/Task");
 const authMiddleware = require("../middleware/auth");
 const { broadcastUpdate } = require("../services/realtime");
+const {
+  getDisplayStateCache,
+  setDisplayStateCache,
+  invalidateDisplayStateCache,
+} = require("../cache/displayStateCache");
 
 const router = express.Router();
 
+function sendDisplayStateResponse(res, payload) {
+  // Cache the response before sending
+  setDisplayStateCache(payload);
+  return res.json(payload);
+}
+
 const emitUpdate = (req, data) => {
+  // Invalidate cache when data changes
+  invalidateDisplayStateCache();
   void broadcastUpdate(req, data);
 };
 
@@ -111,6 +124,12 @@ router.get("/tasks/public/latest", async (_req, res) => {
 
 router.get("/tasks/public/display-state", async (_req, res) => {
   try {
+    // Try to serve from cache first
+    const cachedResult = getDisplayStateCache();
+    if (cachedResult) {
+      return res.json(cachedResult);
+    }
+
     res.set("Cache-Control", "no-store, no-cache, must-revalidate");
     res.set("Pragma", "no-cache");
     res.set("Expires", "0");
@@ -161,7 +180,7 @@ router.get("/tasks/public/display-state", async (_req, res) => {
     };
 
     if (!displayUserId) {
-      return res.json({
+      return sendDisplayStateResponse(res, {
         ...basePayload,
         mode: "slideshow",
         slideshowPhotos: [],
@@ -234,7 +253,7 @@ router.get("/tasks/public/display-state", async (_req, res) => {
         alarmAutoStopSeconds - Math.floor(elapsed / 1000)
       );
 
-      return res.json({
+      return sendDisplayStateResponse(res, {
         ...basePayload,
         mode: "alarm",
         autoStopSeconds: alarmAutoStopSeconds,
@@ -277,7 +296,7 @@ router.get("/tasks/public/display-state", async (_req, res) => {
           reminderAutoDismissSeconds - Math.floor(elapsedMs / 1000)
         );
 
-        return res.json({
+        return sendDisplayStateResponse(res, {
           ...basePayload,
           mode: "reminder",
           slideshowPhotos,
@@ -300,7 +319,7 @@ router.get("/tasks/public/display-state", async (_req, res) => {
 
     if (pushNotifications && canShowDailySummary) {
       const remainingTasks = tasks.filter((task) => !task.dismissed);
-      return res.json({
+      return sendDisplayStateResponse(res, {
         ...basePayload,
         mode: "daily_summary",
         summary: {
@@ -324,7 +343,7 @@ router.get("/tasks/public/display-state", async (_req, res) => {
     });
 
     if (pushNotifications && nextTask) {
-      return res.json({
+      return sendDisplayStateResponse(res, {
         ...basePayload,
         mode: "upcoming",
         slideshowPhotos,
@@ -335,7 +354,7 @@ router.get("/tasks/public/display-state", async (_req, res) => {
     }
 
     if (!slideshowEnabled) {
-      return res.json({
+      return sendDisplayStateResponse(res, {
         ...basePayload,
         mode: "single_image",
         slideshowPhotos,
@@ -343,7 +362,7 @@ router.get("/tasks/public/display-state", async (_req, res) => {
       });
     }
 
-    return res.json({
+    return sendDisplayStateResponse(res, {
       ...basePayload,
       mode: "slideshow",
       slideshowPhotos,

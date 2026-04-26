@@ -4,10 +4,13 @@ const Alarm = require("../models/Alarm");
 const Setting = require("../models/Setting");
 const authMiddleware = require("../middleware/auth");
 const { broadcastUpdate } = require("../services/realtime");
+const { invalidateDisplayStateCache } = require("../cache/displayStateCache");
 
 const router = express.Router();
 
 const emitUpdate = (req, data) => {
+  // Invalidate display-state cache when alarm changes
+  invalidateDisplayStateCache();
   void broadcastUpdate(req, data);
 };
 

@@ -7,10 +7,13 @@ const mongoose = require("mongoose");
 const authMiddleware = require("../middleware/auth");
 const Photo = require("../models/Photo");
 const { broadcastUpdate } = require("../services/realtime");
+const { invalidateDisplayStateCache } = require("../cache/displayStateCache");
 
 const router = express.Router();
 
 const emitUpdate = (req, data) => {
+  // Invalidate display-state cache when photos change
+  invalidateDisplayStateCache();
   void broadcastUpdate(req, data);
 };
 

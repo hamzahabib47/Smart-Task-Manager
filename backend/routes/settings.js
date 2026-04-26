@@ -3,10 +3,13 @@ const express = require("express");
 const authMiddleware = require("../middleware/auth");
 const Setting = require("../models/Setting");
 const { broadcastUpdate } = require("../services/realtime");
+const { invalidateDisplayStateCache } = require("../cache/displayStateCache");
 
 const router = express.Router();
 
 const emitUpdate = (req, data) => {
+  // Invalidate display-state cache when settings change
+  invalidateDisplayStateCache();
   void broadcastUpdate(req, data);
 };
 
