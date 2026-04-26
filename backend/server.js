@@ -90,14 +90,6 @@ app.use("/api", deviceRoutes);
 app.use("/api", alarmRoutes);
 app.use("/api", taskRoutes);
 
-// 404 handler
-app.use((req, res) => {
-  res.status(404).json({
-    success: false,
-    message: "Route not found",
-  });
-});
-
 const uploadsPath = isVercelRuntime
   ? path.join("/tmp", "uploads")
   : path.join(__dirname, "uploads");
@@ -108,6 +100,7 @@ const renamedDisplayPath = path.join(__dirname, "..", "web_display");
 const displayPath = fs.existsSync(renamedDisplayPath)
   ? renamedDisplayPath
   : legacyDisplayPath;
+
 app.use(
   "/display",
   express.static(displayPath, {
@@ -120,6 +113,30 @@ app.use(
     },
   })
 );
+
+app.get("/display", (_req, res) => {
+  res.sendFile(path.join(displayPath, "index.html"));
+});
+
+app.get("/display/", (_req, res) => {
+  res.sendFile(path.join(displayPath, "index.html"));
+});
+
+// 404 handler
+app.use((req, res) => {
+  res.status(404).json({
+    success: false,
+    message: "Route not found",
+  });
+});
+
+// 404 handler
+app.use((req, res) => {
+  res.status(404).json({
+    success: false,
+    message: "Route not found",
+  });
+});
 
 if (!isVercelRuntime) {
   const PORT = process.env.PORT || 5000;
