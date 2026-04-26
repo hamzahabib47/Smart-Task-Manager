@@ -42,29 +42,32 @@ app.locals.updateEmitter = updateEmitter;
 app.use(cors());
 app.use(express.json());
 
-// SSE endpoint for real-time updates (works on Vercel)
-app.get("/api/updates/subscribe", (req, res) => {
-  res.setHeader("Content-Type", "text/event-stream");
-  res.setHeader("Cache-Control", "no-cache");
-  res.setHeader("Connection", "keep-alive");
-  res.setHeader("Access-Control-Allow-Origin", "*");
+// SSE endpoint for real-time updates (local development only)
+// On Vercel, clients will use polling fallback instead
+if (!isVercelRuntime) {
+  app.get("/api/updates/subscribe", (req, res) => {
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+    res.setHeader("Access-Control-Allow-Origin", "*");
 
-  // Send initial connection message
-  res.write("data: {\"connected\":true}\n\n");
+    // Send initial connection message
+    res.write("data: {\"connected\":true}\n\n");
 
-  const handleUpdate = (data) => {
-    res.write(`data: ${JSON.stringify(data)}\n\n`);
-  };
+    const handleUpdate = (data) => {
+      res.write(`data: ${JSON.stringify(data)}\n\n`);
+    };
 
-  // Listen for updates
-  updateEmitter.on("dataUpdated", handleUpdate);
+    // Listen for updates
+    updateEmitter.on("dataUpdated", handleUpdate);
 
-  // Clean up on disconnect
-  req.on("close", () => {
-    updateEmitter.removeListener("dataUpdated", handleUpdate);
-    res.end();
+    // Clean up on disconnect
+    req.on("close", () => {
+      updateEmitter.removeListener("dataUpdated", handleUpdate);
+      res.end();
+    });
   });
-});
+}
 
 app.get("/", (_req, res) => {
   res.json({
