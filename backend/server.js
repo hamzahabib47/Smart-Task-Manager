@@ -90,6 +90,14 @@ app.use("/api", deviceRoutes);
 app.use("/api", alarmRoutes);
 app.use("/api", taskRoutes);
 
+// 404 handler
+app.use((req, res) => {
+  res.status(404).json({
+    success: false,
+    message: "Route not found",
+  });
+});
+
 const uploadsPath = isVercelRuntime
   ? path.join("/tmp", "uploads")
   : path.join(__dirname, "uploads");
@@ -144,8 +152,20 @@ if (!isVercelRuntime) {
     startDailySummaryScheduler();
   });
 } else {
-  // SSE works on Vercel, log that it's active
-  console.log("Server running on Vercel with SSE real-time updates");
+  // Vercel serverless function
+  if (process.env.NODE_ENV !== "production") {
+    console.log("Server initialized for Vercel");
+  }
 }
+
+// Global error handling middleware
+app.use((err, req, res, next) => {
+  console.error("Unhandled error:", err);
+  res.status(500).json({
+    success: false,
+    message: "Internal server error",
+    error: process.env.NODE_ENV === "development" ? err.message : undefined,
+  });
+});
 
 module.exports = app;

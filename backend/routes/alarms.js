@@ -8,17 +8,22 @@ const router = express.Router();
 
 // Helper function to emit updates to both Socket.IO and SSE
 const emitUpdate = (req, data) => {
-  const io = req.app.locals.io;
-  const updateEmitter = req.app.locals.updateEmitter;
-  
-  // Emit to Socket.IO (for local development)
-  if (io) {
-    io.emit("dataUpdated", data);
-  }
-  
-  // Emit to EventEmitter for SSE (works on Vercel)
-  if (updateEmitter) {
-    updateEmitter.emit("dataUpdated", data);
+  try {
+    const io = req.app.locals.io;
+    const updateEmitter = req.app.locals.updateEmitter;
+    
+    // Emit to Socket.IO (for local development)
+    if (io) {
+      io.emit("dataUpdated", data);
+    }
+    
+    // Emit to EventEmitter for SSE (local development)
+    if (updateEmitter) {
+      updateEmitter.emit("dataUpdated", data);
+    }
+  } catch (error) {
+    console.error("Error emitting update:", error);
+    // Don't crash - just log and continue
   }
 };
 
@@ -222,7 +227,7 @@ router.patch("/alarms/:id/toggle", async (req, res) => {
     }
 
     // Emit real-time update event
-    emitUpdate(req, { type: \"alarm\", action: \"toggled\", data: alarm });
+    emitUpdate(req, { type: "alarm", action: "toggled", data: alarm });
 
     return res.json({
       success: true,
