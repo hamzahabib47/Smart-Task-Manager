@@ -99,6 +99,18 @@ app.get("/", (_req, res) => {
   });
 });
 
+app.use("/api", async (_req, res, next) => {
+  const connected = await connectDB();
+  if (!connected) {
+    return res.status(503).json({
+      success: false,
+      message: "Service temporarily unavailable. Please try again in a moment.",
+    });
+  }
+
+  return next();
+});
+
 app.use("/api", authRoutes);
 app.use("/api", settingsRoutes);
 app.use("/api", photoRoutes);

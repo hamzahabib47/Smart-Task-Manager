@@ -1615,10 +1615,18 @@ class _TaskScreenState extends State<TaskScreen> {
 
   Future<void> fetchPhotos() async {
     try {
-      final response = await http.get(
+      http.Response response = await http.get(
         Uri.parse("${ApiConfig.baseUrl}/photos"),
         headers: authHeaders,
       );
+
+      if (response.statusCode == 503) {
+        await Future.delayed(const Duration(milliseconds: 700));
+        response = await http.get(
+          Uri.parse("${ApiConfig.baseUrl}/photos"),
+          headers: authHeaders,
+        );
+      }
 
       if (response.statusCode == 200) {
         final body = json.decode(response.body);
@@ -1642,7 +1650,17 @@ class _TaskScreenState extends State<TaskScreen> {
       } else if (response.statusCode == 401) {
         widget.onLogout();
       } else {
-        showMessage("Could not fetch photos");
+        String message = "Could not fetch photos";
+        try {
+          final body = json.decode(response.body) as Map<String, dynamic>;
+          final apiMessage = body["message"];
+          if (apiMessage is String && apiMessage.trim().isNotEmpty) {
+            message = apiMessage.trim();
+          }
+        } catch (_) {
+          // keep fallback message
+        }
+        showMessage(message);
       }
     } catch (_) {
       showMessage("Server error while fetching photos");
