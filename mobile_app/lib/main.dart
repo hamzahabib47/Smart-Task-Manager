@@ -1042,6 +1042,27 @@ class _TaskScreenState extends State<TaskScreen> {
     return "Good Night";
   }
 
+  String _getGreetingEmoji() {
+    final hour = DateTime.now().hour;
+    if (hour >= 5 && hour < 12) return "🌅";
+    if (hour >= 12 && hour < 17) return "☀️";
+    if (hour >= 17 && hour < 21) return "🌆";
+    return "🌙";
+  }
+
+  String _getGreetingMessage() {
+    final hour = DateTime.now().hour;
+    if (hour >= 5 && hour < 12) {
+      return "Ready to conquer the day? Let's get things done!";
+    } else if (hour >= 12 && hour < 17) {
+      return "You're doing great! Keep the momentum going.";
+    } else if (hour >= 17 && hour < 21) {
+      return "Wrapping up? Let's finish strong today.";
+    } else {
+      return "Burning the midnight oil? Take care of yourself!";
+    }
+  }
+
   Future<void> confirmSignOut() async {
     final shouldLogout = await showDialog<bool>(
       context: context,
@@ -2044,86 +2065,160 @@ class _TaskScreenState extends State<TaskScreen> {
     required Widget child,
   }) {
     return Card(
-      elevation: 2,
+      elevation: 0,
       color: Colors.white,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-      shadowColor: Colors.black.withValues(alpha: 0.08),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
-              children: [
-                Container(
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFE8F6F3),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  padding: const EdgeInsets.all(10),
-                  child: Icon(icon, size: 18, color: const Color(0xFF0D9488)),
-                ),
-                const SizedBox(width: 12),
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w800,
-                    fontSize: 16,
-                  ),
-                ),
-              ],
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+        side: BorderSide(
+          color: Colors.black.withValues(alpha: 0.05),
+          width: 1,
+        ),
+      ),
+      shadowColor: Colors.black.withValues(alpha: 0.1),
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.06),
+              blurRadius: 15,
+              offset: const Offset(0, 4),
             ),
-            const SizedBox(height: 14),
-            child,
           ],
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          const Color(0xFF0D9488).withValues(alpha: 0.15),
+                          const Color(0xFF0F766E).withValues(alpha: 0.08),
+                        ],
+                      ),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: const Color(0xFF0D9488).withValues(alpha: 0.2),
+                      ),
+                    ),
+                    padding: const EdgeInsets.all(11),
+                    child: Icon(
+                      icon,
+                      size: 20,
+                      color: const Color(0xFF0D9488),
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Text(
+                      title,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 17,
+                        color: Color(0xFF111827),
+                        letterSpacing: 0.2,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 18),
+              child,
+            ],
+          ),
         ),
       ),
     );
   }
 
   Widget buildDashboardTabs() {
-    final tabs = ["Photos", "Task", "Alarm", "Display", "Settings", "Sign out"];
+    final tabs = [
+      {"label": "Photos", "icon": Icons.image_rounded},
+      {"label": "Task", "icon": Icons.task_alt},
+      {"label": "Alarm", "icon": Icons.alarm_rounded},
+      {"label": "Display", "icon": Icons.tv_rounded},
+      {"label": "Settings", "icon": Icons.settings_rounded},
+      {"label": "Sign out", "icon": Icons.logout_rounded},
+    ];
+    
     return Container(
-      padding: const EdgeInsets.all(10),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Wrap(
         spacing: 8,
         runSpacing: 8,
         children: List.generate(tabs.length, (index) {
-          final tabLabel = tabs[index];
+          final tab = tabs[index];
+          final tabLabel = tab["label"] as String;
+          final tabIcon = tab["icon"] as IconData;
           final isSignOutTab = tabLabel == "Sign out";
           final selected = !isSignOutTab && selectedDashboardTab == index;
+          
           final tabBackgroundColor = selected
-              ? const Color(0xFFE95B0C)
-              : (isSignOutTab ? const Color(0xFFFFF1F2) : Colors.white);
+              ? const Color(0xFF0D9488)
+              : (isSignOutTab ? const Color(0xFFFEE2E2) : const Color(0xFFF3F4F6));
           final tabTextColor = selected
               ? Colors.white
-              : (isSignOutTab ? const Color(0xFFB91C1C) : const Color(0xFF0F172A));
+              : (isSignOutTab ? const Color(0xFFDC2626) : const Color(0xFF374151));
+          final tabIconColor = selected
+              ? Colors.white
+              : (isSignOutTab ? const Color(0xFFDC2626) : const Color(0xFF6B7280));
 
-          return InkWell(
-            borderRadius: BorderRadius.circular(12),
-            onTap: () async {
-              if (isSignOutTab) {
-                await confirmSignOut();
-                return;
-              }
-              setState(() => selectedDashboardTab = index);
-            },
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
-              decoration: BoxDecoration(
-                color: tabBackgroundColor,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFFE5E7EB)),
-              ),
-              child: Text(
-                tabLabel,
-                style: TextStyle(
-                  color: tabTextColor,
-                  fontWeight: FontWeight.w600,
+          return Material(
+            color: Colors.transparent,
+            child: InkWell(
+              borderRadius: BorderRadius.circular(14),
+              onTap: () async {
+                if (isSignOutTab) {
+                  await confirmSignOut();
+                  return;
+                }
+                setState(() => selectedDashboardTab = index);
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                decoration: BoxDecoration(
+                  color: tabBackgroundColor,
+                  borderRadius: BorderRadius.circular(14),
+                  border: selected
+                      ? Border.all(color: const Color(0xFF0D9488), width: 2)
+                      : Border.all(color: Colors.transparent),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      tabIcon,
+                      color: tabIconColor,
+                      size: 18,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      tabLabel,
+                      style: TextStyle(
+                        color: tabTextColor,
+                        fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -3404,7 +3499,6 @@ class _TaskScreenState extends State<TaskScreen> {
           bottom: false,
           child: LayoutBuilder(
             builder: (context, constraints) {
-              final titleColor = Theme.of(context).colorScheme.primary;
               final titleSize = constraints.maxWidth < 420 ? 30.0 : 36.0;
 
               return SingleChildScrollView(
@@ -3413,10 +3507,24 @@ class _TaskScreenState extends State<TaskScreen> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Container(
-                      padding: const EdgeInsets.all(20),
+                      padding: const EdgeInsets.all(24),
                       decoration: BoxDecoration(
-                        color: Colors.white,
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            const Color(0xFF0D9488).withValues(alpha: 0.95),
+                            const Color(0xFF0F766E).withValues(alpha: 0.95),
+                          ],
+                        ),
                         borderRadius: BorderRadius.circular(24),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFF0D9488).withValues(alpha: 0.15),
+                            blurRadius: 20,
+                            offset: const Offset(0, 8),
+                          ),
+                        ],
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -3428,41 +3536,85 @@ class _TaskScreenState extends State<TaskScreen> {
                               fontSize: titleSize,
                               height: 1.05,
                               fontWeight: FontWeight.w900,
-                              color: titleColor,
+                              color: Colors.white,
+                              letterSpacing: 0.5,
                             ),
                           ),
-                          const SizedBox(height: 14),
+                          const SizedBox(height: 18),
+                          // Greeting with emoji
                           Row(
-                            crossAxisAlignment: CrossAxisAlignment.center,
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
+                              Text(
+                                _getGreetingEmoji(),
+                                style: const TextStyle(fontSize: 32),
+                              ),
+                              const SizedBox(width: 12),
                               Expanded(
-                                child: Row(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Expanded(
-                                      child: Text(
-                                        "${_timeGreeting()}, ${_userDisplayName()}!",
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.w900,
-                                          fontSize: 18,
-                                          color: Color(0xFF0F172A),
-                                        ),
+                                    Text(
+                                      "${_timeGreeting()}, ${_userDisplayName()}!",
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w900,
+                                        fontSize: 20,
+                                        color: Colors.white,
+                                        height: 1.2,
                                       ),
                                     ),
-                                    const SizedBox(width: 10),
+                                    const SizedBox(height: 6),
                                     Text(
-                                      headerTimeText,
-                                      style: const TextStyle(
-                                        color: Color(0xFF374151),
-                                        fontWeight: FontWeight.w700,
-                                        fontSize: 16,
+                                      _getGreetingMessage(),
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w500,
+                                        fontSize: 13,
+                                        color: Colors.white.withValues(alpha: 0.85),
+                                        height: 1.3,
                                       ),
                                     ),
                                   ],
                                 ),
                               ),
                             ],
+                          ),
+                          const SizedBox(height: 16),
+                          // Time and separator
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 10,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: Colors.white.withValues(alpha: 0.2),
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(
+                                  Icons.access_time_rounded,
+                                  color: Colors.white,
+                                  size: 18,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  headerTimeText,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 15,
+                                    letterSpacing: 0.3,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ],
                       ),
