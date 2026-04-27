@@ -3123,24 +3123,24 @@ class _TaskScreenState extends State<TaskScreen> {
               },
             ),
             const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              children: [
-                FilledButton(
-                  onPressed: isAddingAlarm ? null : addAlarm,
-                  child: _buttonContent(
-                    "Add Alarm",
-                    icon: Icons.alarm_add,
-                    isLoading: isAddingAlarm,
-                  ),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: isAddingAlarm ? null : addAlarm,
+                child: _buttonContent(
+                  "Add Alarm",
+                  icon: Icons.alarm_add,
+                  isLoading: isAddingAlarm,
                 ),
-                TextButton(
-                  onPressed: fetchAlarms,
-                  child: const Text("Refresh"),
-                ),
-              ],
+              ),
+            ),
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton(
+                onPressed: fetchAlarms,
+                child: const Text("Refresh"),
+              ),
             ),
             const SizedBox(height: 8),
             alarms.isEmpty
