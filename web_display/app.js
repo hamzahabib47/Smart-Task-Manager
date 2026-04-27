@@ -19,6 +19,7 @@ let cachedDisplayState = null;
 const CACHE_TTL_MS = 2000; // Cache for 2 seconds
 const MIN_REQUEST_INTERVAL_MS = 1000; // Minimum 1 second between requests
 let pendingDisplayStateReload = false;
+let pendingForceRefresh = false;
 let reloadDebounceTimer = null;
 
 function clearDisplayStateCache() {
@@ -37,36 +38,26 @@ function getValidCachedDisplayState() {
   return null;
 }
 
-function debouncedLoadDisplayState() {
+function debouncedLoadDisplayState(forceRefresh = false) {
   if (reloadDebounceTimer) clearTimeout(reloadDebounceTimer);
   
   pendingDisplayStateReload = true;
+  if (forceRefresh) {
+    pendingForceRefresh = true;
+  }
+
   reloadDebounceTimer = setTimeout(() => {
+    const shouldForceRefresh = pendingForceRefresh;
     pendingDisplayStateReload = false;
+    pendingForceRefresh = false;
     reloadDebounceTimer = null;
-    loadDisplayState();
+    loadDisplayState({ forceRefresh: shouldForceRefresh });
   }, 300); // 300ms debounce window for rapid updates
 }
 
 // Real-time sources
 let pusherClient = null;
 let eventSource = null;
-let pollingFallbackTimer = null;
-
-function startPollingFallback() {
-  if (!pollingFallbackTimer) {
-    // Increased from 5s to 30s to reduce redundant polling
-    pollingFallbackTimer = setInterval(loadDisplayState, 30000);
-    console.log("Polling fallback active (30s)");
-  }
-}
-
-function stopPollingFallback() {
-  if (pollingFallbackTimer) {
-    clearInterval(pollingFallbackTimer);
-    pollingFallbackTimer = null;
-  }
-}
 
 function initializeSSEUpdates() {
   try {
@@ -74,7 +65,6 @@ function initializeSSEUpdates() {
 
     eventSource.onopen = () => {
       console.log("Connected to SSE update stream");
-      stopPollingFallback();
     };
 
     eventSource.onmessage = (event) => {
@@ -85,8 +75,10 @@ function initializeSSEUpdates() {
           return;
         }
         console.log("Data updated via SSE:", data);
-        // Debounce rapid SSE updates to avoid request flooding
-        debouncedLoadDisplayState();
+        clearDisplayStateCache();
+        // Debounce rapid SSE updates to avoid request flooding.
+        // Force refresh so realtime updates never reuse stale cache.
+        debouncedLoadDisplayState(true);
       } catch (error) {
         console.error("Error parsing SSE message:", error);
       }
@@ -95,11 +87,14 @@ function initializeSSEUpdates() {
     eventSource.onerror = (error) => {
       console.error("SSE connection error:", error);
       eventSource.close();
-      startPollingFallback();
+
+      // Retry SSE without polling fallback.
+      setTimeout(() => {
+        initializeSSEUpdates();
+      }, 2000);
     };
   } catch (error) {
     console.error("Failed to initialize SSE updates:", error);
-    startPollingFallback();
   }
 }
 
@@ -111,19 +106,18 @@ function initializeSocketIoUpdates() {
 
   try {
     socketIoClient = io(API_BASE_URL, {
-      transports: ["websocket", "polling"],
+      transports: ["websocket"],
       reconnectionAttempts: 5,
     });
 
     socketIoClient.on("connect", () => {
       console.log("Connected to Socket.IO realtime stream");
-      stopPollingFallback();
     });
 
     socketIoClient.on("dataUpdated", (data) => {
       console.log("Data updated via Socket.IO:", data);
-      stopPollingFallback();
-      debouncedLoadDisplayState();
+      clearDisplayStateCache();
+      debouncedLoadDisplayState(true);
     });
 
     socketIoClient.on("connect_error", (error) => {
@@ -136,9 +130,6 @@ function initializeSocketIoUpdates() {
 
     socketIoClient.on("disconnect", (reason) => {
       console.warn("Socket.IO disconnected:", reason);
-      if (reason !== "io client disconnect") {
-        startPollingFallback();
-      }
     });
 
     return true;
@@ -164,14 +155,13 @@ function initializePusherUpdates(config) {
     const channel = pusherClient.subscribe(config.channel);
     channel.bind(config.event, (data) => {
       console.log("Data updated via Pusher:", data);
-      stopPollingFallback();
+      clearDisplayStateCache();
       // Debounce rapid Pusher events
-      debouncedLoadDisplayState();
+      debouncedLoadDisplayState(true);
     });
 
     pusherClient.connection.bind("connected", () => {
       console.log("Connected to Pusher real-time stream");
-      stopPollingFallback();
     });
 
     pusherClient.connection.bind("error", (error) => {
@@ -185,10 +175,6 @@ function initializePusherUpdates(config) {
 }
 
 async function initializeRealTimeUpdates() {
-  if (initializeSocketIoUpdates()) {
-    return;
-  }
-
   try {
     const response = await fetch(REALTIME_CONFIG_ENDPOINT, {
       cache: "no-store",
@@ -210,6 +196,10 @@ async function initializeRealTimeUpdates() {
     }
   } catch (error) {
     console.error("Realtime config fetch failed:", error);
+  }
+
+  if (initializeSocketIoUpdates()) {
+    return;
   }
 
   initializeSSEUpdates();
@@ -530,34 +520,45 @@ function applySlideshowData(result) {
   return changed;
 }
 
-async function loadDisplayState() {
+async function loadDisplayState({ forceRefresh = false } = {}) {
   // Request deduplication: prevent concurrent requests
   if (displayStateInFlight) {
     console.log("Display state request already in flight, skipping");
+    if (forceRefresh && !pendingDisplayStateReload) {
+      debouncedLoadDisplayState(true);
+    }
     return;
+  }
+
+  if (forceRefresh) {
+    clearDisplayStateCache();
   }
 
   // Rate limiting: ensure minimum interval between requests
-  const timeSinceLastRequest = Date.now() - lastDisplayStateTimestamp;
-  if (timeSinceLastRequest < MIN_REQUEST_INTERVAL_MS) {
-    console.log("Too soon since last request, using cache or deferring");
-    const cached = getValidCachedDisplayState();
-    if (cached) {
-      return; // Serve from cache silently
+  if (!forceRefresh) {
+    const timeSinceLastRequest = Date.now() - lastDisplayStateTimestamp;
+    if (timeSinceLastRequest < MIN_REQUEST_INTERVAL_MS) {
+      console.log("Too soon since last request, using cache or deferring");
+      const cached = getValidCachedDisplayState();
+      if (cached) {
+        return; // Serve from cache silently
+      }
+      // Defer the request
+      if (!pendingDisplayStateReload) {
+        debouncedLoadDisplayState();
+      }
+      return;
     }
-    // Defer the request
-    if (!pendingDisplayStateReload) {
-      debouncedLoadDisplayState();
-    }
-    return;
   }
 
   // Try to use cached response if available
-  const cachedResult = getValidCachedDisplayState();
-  if (cachedResult) {
-    console.log("Serving from cache");
-    await renderDisplayState(cachedResult);
-    return;
+  if (!forceRefresh) {
+    const cachedResult = getValidCachedDisplayState();
+    if (cachedResult) {
+      console.log("Serving from cache");
+      await renderDisplayState(cachedResult);
+      return;
+    }
   }
 
   displayStateInFlight = true;
