@@ -1091,12 +1091,12 @@ class _TaskScreenState extends State<TaskScreen> {
     return "Good Night";
   }
 
-  String _getGreetingEmoji() {
+  IconData _getGreetingIcon() {
     final hour = DateTime.now().hour;
-    if (hour >= 5 && hour < 12) return "����";
-    if (hour >= 12 && hour < 17) return "��Ǵ��";
-    if (hour >= 17 && hour < 21) return "����";
-    return "����";
+    if (hour >= 5 && hour < 12) return Icons.wb_sunny_rounded;
+    if (hour >= 12 && hour < 17) return Icons.light_mode_rounded;
+    if (hour >= 17 && hour < 21) return Icons.wb_twilight_rounded;
+    return Icons.nightlight_round;
   }
 
   String _getGreetingMessage() {
@@ -3694,13 +3694,14 @@ class _TaskScreenState extends State<TaskScreen> {
                             ),
                           ),
                           const SizedBox(height: 10),
-                          // Greeting with emoji
+                          // Greeting with time-based icon
                           Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(
-                                _getGreetingEmoji(),
-                                style: const TextStyle(fontSize: 24),
+                              Icon(
+                                _getGreetingIcon(),
+                                size: 24,
+                                color: Colors.white,
                               ),
                               const SizedBox(width: 10),
                               Expanded(
