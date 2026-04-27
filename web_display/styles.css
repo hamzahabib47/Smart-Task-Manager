@@ -256,6 +256,75 @@ body {
   font-size: clamp(1.05rem, 2.4vw, 1.7rem);
 }
 
+.fullscreen-btn {
+  position: fixed;
+  bottom: clamp(12px, 3vh, 28px);
+  right: clamp(12px, 3vw, 28px);
+  z-index: 100;
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  background: linear-gradient(
+    120deg,
+    rgba(2, 6, 23, 0.76) 0%,
+    rgba(15, 23, 42, 0.58) 100%
+  );
+  backdrop-filter: blur(8px);
+  color: rgba(226, 232, 240, 0.92);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease-in-out;
+  padding: 0;
+}
+
+.fullscreen-btn:hover {
+  background: linear-gradient(
+    120deg,
+    rgba(2, 6, 23, 0.9) 0%,
+    rgba(15, 23, 42, 0.75) 100%
+  );
+  border-color: rgba(148, 163, 184, 0.55);
+  color: #f8fafc;
+  transform: scale(1.05);
+}
+
+.fullscreen-btn:active {
+  transform: scale(0.95);
+}
+
+.fullscreen-btn svg {
+  width: 24px;
+  height: 24px;
+  stroke-width: 2;
+}
+
+.fullscreen-btn.hidden {
+  opacity: 0;
+  pointer-events: none;
+  transform: scale(0.8);
+}
+
+.screen.fullscreen-active .topbar {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease-in-out;
+}
+
+.screen.fullscreen-active .fullscreen-btn {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease-in-out;
+}
+
+.screen.fullscreen-active.show-controls .topbar,
+.screen.fullscreen-active.show-controls .fullscreen-btn {
+  opacity: 1;
+  pointer-events: auto;
+}
+
 @media (max-width: 900px) {
   .status-cluster {
     flex-wrap: wrap;
@@ -284,5 +353,15 @@ body {
   .mode-reminder-full .content-card {
     top: 12px;
     bottom: 12px;
+  }
+
+  .fullscreen-btn {
+    width: 44px;
+    height: 44px;
+  }
+
+  .fullscreen-btn svg {
+    width: 20px;
+    height: 20px;
   }
 }

@@ -786,13 +786,86 @@ async function renderDisplayState(result) {
   }
 }
 
-document.addEventListener(
-  "pointerdown",
-  () => {
-    ensureAudioContext();
-  },
-  { passive: true }
-);
+// ============== FULLSCREEN FUNCTIONALITY ==============
+const fullscreenBtn = document.getElementById("fullscreenBtn");
+let fullscreenControlsHideTimer = null;
+
+function requestFullscreen() {
+  if (!document.fullscreenElement) {
+    const elem = document.documentElement;
+    if (elem.requestFullscreen) {
+      elem.requestFullscreen();
+    }
+  }
+}
+
+function exitFullscreen() {
+  if (document.fullscreenElement) {
+    document.exitFullscreen();
+  }
+}
+
+function toggleFullscreen() {
+  if (document.fullscreenElement) {
+    exitFullscreen();
+  } else {
+    requestFullscreen();
+  }
+}
+
+function hideFullscreenControls() {
+  screen.classList.remove("show-controls");
+}
+
+function showFullscreenControls() {
+  if (document.fullscreenElement) {
+    screen.classList.add("show-controls");
+    
+    // Clear existing timer
+    if (fullscreenControlsHideTimer) {
+      clearTimeout(fullscreenControlsHideTimer);
+    }
+    
+    // Hide controls after 3 seconds of inactivity
+    fullscreenControlsHideTimer = setTimeout(() => {
+      hideFullscreenControls();
+    }, 3000);
+  }
+}
+
+fullscreenBtn.addEventListener("click", toggleFullscreen);
+
+document.addEventListener("fullscreenchange", () => {
+  if (document.fullscreenElement) {
+    screen.classList.add("fullscreen-active");
+    showFullscreenControls();
+  } else {
+    screen.classList.remove("fullscreen-active", "show-controls");
+    if (fullscreenControlsHideTimer) {
+      clearTimeout(fullscreenControlsHideTimer);
+    }
+  }
+});
+
+// Show controls on any interaction when in fullscreen
+document.addEventListener("pointerdown", () => {
+  ensureAudioContext();
+  if (document.fullscreenElement) {
+    showFullscreenControls();
+  }
+}, { passive: true });
+
+document.addEventListener("mousemove", () => {
+  if (document.fullscreenElement) {
+    showFullscreenControls();
+  }
+}, { passive: true });
+
+document.addEventListener("keydown", () => {
+  if (document.fullscreenElement) {
+    showFullscreenControls();
+  }
+}, { passive: true });
 
 startClock();
 ensureCountdownTimer();
