@@ -8,6 +8,7 @@ const DISMISS_TASK_ENDPOINT = `${API_BASE_URL}/api/tasks/public`;
 const STOP_ALARM_ENDPOINT = `${API_BASE_URL}/api/alarms/public`;
 const REALTIME_CONFIG_ENDPOINT = `${API_BASE_URL}/api/realtime/config`;
 const ALARM_VOLUME = 0.22;
+const IS_VERCEL_DEPLOYMENT = /vercel\.app$/i.test(new URL(API_BASE_URL).hostname);
 
 let socketIoClient = null;
 
@@ -60,6 +61,11 @@ let pusherClient = null;
 let eventSource = null;
 
 function initializeSSEUpdates() {
+  if (IS_VERCEL_DEPLOYMENT) {
+    console.warn("SSE updates are disabled on Vercel to avoid unnecessary reconnect requests.");
+    return;
+  }
+
   try {
     eventSource = new EventSource(`${API_BASE_URL}/api/updates/subscribe`);
 
@@ -87,11 +93,6 @@ function initializeSSEUpdates() {
     eventSource.onerror = (error) => {
       console.error("SSE connection error:", error);
       eventSource.close();
-
-      // Retry SSE without polling fallback.
-      setTimeout(() => {
-        initializeSSEUpdates();
-      }, 2000);
     };
   } catch (error) {
     console.error("Failed to initialize SSE updates:", error);
