@@ -2608,11 +2608,6 @@ class _TaskScreenState extends State<TaskScreen> {
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
                   title: const Text("Enable slideshow mode"),
-                  subtitle: Text(
-                    slideshowEnabled
-                        ? "Photos rotate automatically"
-                        : "Only one selected image will be shown",
-                  ),
                   value: slideshowEnabled,
                   onChanged: (value) async {
                     setState(() => slideshowEnabled = value);
@@ -2708,26 +2703,24 @@ class _TaskScreenState extends State<TaskScreen> {
             icon: Icons.image_outlined,
             child: Column(
               children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: fetchPhotos,
-                        child: const Text("Refresh"),
-                      ),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    onPressed: isUploadingPhoto ? null : uploadPhoto,
+                    child: _buttonContent(
+                      "Upload Photos",
+                      icon: Icons.upload,
+                      isLoading: isUploadingPhoto,
                     ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: FilledButton(
-                        onPressed: isUploadingPhoto ? null : uploadPhoto,
-                        child: _buttonContent(
-                          "Upload Photos",
-                          icon: Icons.upload,
-                          isLoading: isUploadingPhoto,
-                        ),
-                      ),
-                    ),
-                  ],
+                  ),
+                ),
+                const SizedBox(height: 8),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton(
+                    onPressed: fetchPhotos,
+                    child: const Text("Refresh"),
+                  ),
                 ),
                 const SizedBox(height: 10),
                 SizedBox(
