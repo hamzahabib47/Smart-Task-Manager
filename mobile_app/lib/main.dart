@@ -1060,7 +1060,7 @@ class _TaskScreenState extends State<TaskScreen> {
 
   Widget _buttonContent(String label,
       {IconData? icon, bool isLoading = false}) {
-    final textStyle = const TextStyle(fontWeight: FontWeight.w600);
+    const textStyle = TextStyle(fontWeight: FontWeight.w600);
 
     if (isLoading) {
       return Row(
@@ -2858,15 +2858,15 @@ class _TaskScreenState extends State<TaskScreen> {
                   width: double.infinity,
                   child: FilledButton(
                     onPressed: isAddingTask ? null : addTask,
-                    child: _buttonContent(
-                      "Add Task",
-                      icon: Icons.add_task,
-                      isLoading: isAddingTask,
-                    ),
                     style: FilledButton.styleFrom(
                       backgroundColor: const Color(0xFF0D9488),
                       foregroundColor: Colors.white,
                       minimumSize: const Size.fromHeight(48),
+                    ),
+                    child: _buttonContent(
+                      "Add Task",
+                      icon: Icons.add_task,
+                      isLoading: isAddingTask,
                     ),
                   ),
                 ),
