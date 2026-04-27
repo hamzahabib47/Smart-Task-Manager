@@ -22,6 +22,7 @@ const MIN_REQUEST_INTERVAL_MS = 1000; // Minimum 1 second between requests
 let pendingDisplayStateReload = false;
 let pendingForceRefresh = false;
 let reloadDebounceTimer = null;
+let lastClockMinuteKey = "";
 
 function clearDisplayStateCache() {
   cachedDisplayState = null;
@@ -242,6 +243,15 @@ const SCREEN_MODES = [
 ];
 
 function startClock() {
+  const minuteKey = (date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    const hour = String(date.getHours()).padStart(2, "0");
+    const minute = String(date.getMinutes()).padStart(2, "0");
+    return `${year}-${month}-${day} ${hour}:${minute}`;
+  };
+
   const updateClock = () => {
     const now = new Date();
     const is24 = currentTimeFormat === "24-hour";
@@ -251,6 +261,15 @@ function startClock() {
       second: "2-digit",
       hour12: !is24,
     });
+
+    // Time-based states (upcoming -> reminder/alarm) need a minute tick refresh
+    // even when there is no data mutation event from mobile.
+    const currentMinuteKey = minuteKey(now);
+    if (lastClockMinuteKey && currentMinuteKey !== lastClockMinuteKey) {
+      clearDisplayStateCache();
+      debouncedLoadDisplayState(true);
+    }
+    lastClockMinuteKey = currentMinuteKey;
   };
 
   updateClock();
@@ -795,6 +814,18 @@ document.addEventListener(
   },
   { passive: true }
 );
+
+window.addEventListener("focus", () => {
+  clearDisplayStateCache();
+  debouncedLoadDisplayState(true);
+});
+
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden) {
+    clearDisplayStateCache();
+    debouncedLoadDisplayState(true);
+  }
+});
 
 startClock();
 ensureCountdownTimer();
