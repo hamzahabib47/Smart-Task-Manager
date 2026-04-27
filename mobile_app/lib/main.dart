@@ -97,6 +97,60 @@ class _SmartTimeManagerAppState extends State<SmartTimeManagerApp> {
         colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF0D9488)),
         scaffoldBackgroundColor: const Color(0xFFF6F8FB),
         appBarTheme: const AppBarTheme(centerTitle: false),
+        filledButtonTheme: FilledButtonThemeData(
+          style: FilledButton.styleFrom(
+            minimumSize: const Size.fromHeight(46),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            textStyle: const TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+        outlinedButtonTheme: OutlinedButtonThemeData(
+          style: OutlinedButton.styleFrom(
+            minimumSize: const Size.fromHeight(46),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            textStyle: const TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+        elevatedButtonTheme: ElevatedButtonThemeData(
+          style: ElevatedButton.styleFrom(
+            minimumSize: const Size.fromHeight(46),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            textStyle: const TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+        textButtonTheme: TextButtonThemeData(
+          style: TextButton.styleFrom(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+            textStyle: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+        iconButtonTheme: IconButtonThemeData(
+          style: IconButton.styleFrom(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+          ),
+        ),
         inputDecorationTheme: InputDecorationTheme(
           filled: true,
           fillColor: Colors.white,
@@ -265,7 +319,6 @@ class _AnimatedDotsLoaderState extends State<AnimatedDotsLoader>
 class ApiConfig {
   static const String baseUrl = "https://smart-task-manager-tan.vercel.app/api";
 }
-
 
 class Task {
   final String id;
@@ -445,10 +498,9 @@ class _AuthScreenState extends State<AuthScreen> {
     if (isLoading) return;
 
     final registerName = registerNameController.text.trim();
-    final email = (isRegister
-            ? registerEmailController.text
-            : loginEmailController.text)
-        .trim();
+    final email =
+        (isRegister ? registerEmailController.text : loginEmailController.text)
+            .trim();
     final password = (isRegister
             ? registerPasswordController.text
             : loginPasswordController.text)
@@ -504,7 +556,6 @@ class _AuthScreenState extends State<AuthScreen> {
         registerConfirmPasswordError = "Passwords do not match";
         hasError = true;
       }
-
     }
 
     if (hasError) {
@@ -562,18 +613,15 @@ class _AuthScreenState extends State<AuthScreen> {
       if (loginResponse.statusCode == 200) {
         final body = _tryDecodeBody(loginResponse.body);
         final data = body["data"];
-        final dataMap = data is Map<String, dynamic>
-            ? data
-            : const <String, dynamic>{};
+        final dataMap =
+            data is Map<String, dynamic> ? data : const <String, dynamic>{};
         final user = dataMap["user"];
-        final userMap = user is Map<String, dynamic>
-            ? user
-            : const <String, dynamic>{};
+        final userMap =
+            user is Map<String, dynamic> ? user : const <String, dynamic>{};
         final token = dataMap["token"];
         final apiName = (userMap["name"] ?? "").toString().trim();
-        final fallbackName = isRegister
-            ? registerName
-            : email.split("@").first.trim();
+        final fallbackName =
+            isRegister ? registerName : email.split("@").first.trim();
         final resolvedName = apiName.isNotEmpty ? apiName : fallbackName;
 
         if (token is String && token.isNotEmpty) {
@@ -615,7 +663,8 @@ class _AuthScreenState extends State<AuthScreen> {
     } on Exception {
       setState(() {
         if (isRegister) {
-          registerGeneralError = "No internet connection or server unreachable.";
+          registerGeneralError =
+              "No internet connection or server unreachable.";
         } else {
           loginGeneralError = "No internet connection or server unreachable.";
         }
@@ -647,12 +696,10 @@ class _AuthScreenState extends State<AuthScreen> {
   }
 
   Widget buildAuthForm({required bool isRegister}) {
-    final emailController = isRegister
-        ? registerEmailController
-        : loginEmailController;
-    final passwordController = isRegister
-        ? registerPasswordController
-        : loginPasswordController;
+    final emailController =
+        isRegister ? registerEmailController : loginEmailController;
+    final passwordController =
+        isRegister ? registerPasswordController : loginPasswordController;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -705,7 +752,8 @@ class _AuthScreenState extends State<AuthScreen> {
         TextField(
           controller: passwordController,
           obscureText: true,
-          textInputAction: isRegister ? TextInputAction.next : TextInputAction.done,
+          textInputAction:
+              isRegister ? TextInputAction.next : TextInputAction.done,
           autofillHints: isRegister
               ? const [AutofillHints.newPassword]
               : const [AutofillHints.password],
@@ -755,7 +803,8 @@ class _AuthScreenState extends State<AuthScreen> {
             ),
           ),
         ],
-        if ((isRegister ? registerGeneralError : loginGeneralError) != null) ...[
+        if ((isRegister ? registerGeneralError : loginGeneralError) !=
+            null) ...[
           const SizedBox(height: 8),
           Text(
             isRegister ? registerGeneralError! : loginGeneralError!,
@@ -931,6 +980,8 @@ class _TaskScreenState extends State<TaskScreen> {
   String selectedRecurrence = "none";
   bool isLoading = false;
   bool isUploadingPhoto = false;
+  bool isAddingTask = false;
+  bool isAddingAlarm = false;
   bool isDeletingAccount = false;
   bool isSyncingClock = false;
   bool slideshowEnabled = true;
@@ -958,6 +1009,7 @@ class _TaskScreenState extends State<TaskScreen> {
   String previewBannerSubtitle = "";
   bool previewShowEmptyDisplayMessage = false;
   int? previewCountdownSeconds;
+  bool isFetchingDisplayPreview = false;
   String currentUserName = "";
   Timer? headerClockTimer;
   Timer? displayPollTimer;
@@ -985,7 +1037,7 @@ class _TaskScreenState extends State<TaskScreen> {
     startHeaderClock();
     fetchDisplayPreview();
     displayPollTimer = Timer.periodic(
-      const Duration(seconds: 3),
+      const Duration(seconds: 20),
       (_) => fetchDisplayPreview(),
     );
   }
@@ -1009,14 +1061,11 @@ class _TaskScreenState extends State<TaskScreen> {
     final cleaned = raw.trim().replaceAll(RegExp(r"\s+"), " ");
     if (cleaned.isEmpty) return cleaned;
 
-    return cleaned
-        .split(" ")
-        .map((word) {
-          if (word.isEmpty) return word;
-          final lower = word.toLowerCase();
-          return "${lower[0].toUpperCase()}${lower.substring(1)}";
-        })
-        .join(" ");
+    return cleaned.split(" ").map((word) {
+      if (word.isEmpty) return word;
+      final lower = word.toLowerCase();
+      return "${lower[0].toUpperCase()}${lower.substring(1)}";
+    }).join(" ");
   }
 
   String _userDisplayName() {
@@ -1042,12 +1091,12 @@ class _TaskScreenState extends State<TaskScreen> {
     return "Good Night";
   }
 
-  String _getGreetingEmoji() {
+  IconData _getGreetingIcon() {
     final hour = DateTime.now().hour;
-    if (hour >= 5 && hour < 12) return "🌅";
-    if (hour >= 12 && hour < 17) return "☀️";
-    if (hour >= 17 && hour < 21) return "🌆";
-    return "🌙";
+    if (hour >= 5 && hour < 12) return Icons.wb_sunny_rounded;
+    if (hour >= 12 && hour < 17) return Icons.light_mode_rounded;
+    if (hour >= 17 && hour < 21) return Icons.wb_twilight_rounded;
+    return Icons.nightlight_round;
   }
 
   String _getGreetingMessage() {
@@ -1061,6 +1110,41 @@ class _TaskScreenState extends State<TaskScreen> {
     } else {
       return "Burning the midnight oil? Take care of yourself!";
     }
+  }
+
+  Widget _buttonContent(String label,
+      {IconData? icon, bool isLoading = false}) {
+    const textStyle = TextStyle(fontWeight: FontWeight.w600);
+
+    if (isLoading) {
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const SizedBox(
+            width: 16,
+            height: 16,
+            child: CircularProgressIndicator(strokeWidth: 2.2),
+          ),
+          const SizedBox(width: 10),
+          Text(label, style: textStyle),
+        ],
+      );
+    }
+
+    if (icon == null) {
+      return Text(label, style: textStyle);
+    }
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Icon(icon, size: 18),
+        const SizedBox(width: 8),
+        Text(label, style: textStyle),
+      ],
+    );
   }
 
   Future<void> confirmSignOut() async {
@@ -1131,10 +1215,15 @@ class _TaskScreenState extends State<TaskScreen> {
   }
 
   Future<void> fetchDisplayPreview() async {
+    if (isFetchingDisplayPreview) return;
+    isFetchingDisplayPreview = true;
+
     try {
-      final response = await http.get(
-        Uri.parse("${ApiConfig.baseUrl}/tasks/public/display-state"),
-      ).timeout(const Duration(seconds: 30));
+      final response = await http
+          .get(
+            Uri.parse("${ApiConfig.baseUrl}/tasks/public/display-state"),
+          )
+          .timeout(const Duration(seconds: 30));
 
       if (response.statusCode != 200) return;
 
@@ -1179,8 +1268,9 @@ class _TaskScreenState extends State<TaskScreen> {
       } else if (mode == "alarm") {
         nextModeTitle = "Alarm";
         final alarm = body["alarm"] as Map<String, dynamic>?;
-        final alarmTime = (body["alarmTimeFormatted"] ?? alarm?["time"] ?? "--:--")
-            .toString();
+        final alarmTime =
+            (body["alarmTimeFormatted"] ?? alarm?["time"] ?? "--:--")
+                .toString();
         final alarmLabel = (alarm?["label"] ?? "Alarm").toString();
         nextImage = firstPhoto;
         nextPrimary = alarmLabel;
@@ -1194,9 +1284,9 @@ class _TaskScreenState extends State<TaskScreen> {
           nextBannerTitle = "Alarm";
           nextBannerSubtitle = "$alarmLabel at $alarmTime";
         }
-        nextCountdownSeconds =
-            (body["autoStopRemainingSeconds"] ?? body["autoStopSeconds"] ?? 30)
-                as int?;
+        nextCountdownSeconds = (body["autoStopRemainingSeconds"] ??
+            body["autoStopSeconds"] ??
+            30) as int?;
       } else if (mode == "reminder") {
         nextModeTitle = "Reminder";
         final reminder = body["reminder"] as Map<String, dynamic>?;
@@ -1258,6 +1348,8 @@ class _TaskScreenState extends State<TaskScreen> {
       });
     } catch (_) {
       // Keep last preview state if display polling fails temporarily.
+    } finally {
+      isFetchingDisplayPreview = false;
     }
   }
 
@@ -1376,6 +1468,9 @@ class _TaskScreenState extends State<TaskScreen> {
       return;
     }
 
+    if (!mounted) return;
+    setState(() => isAddingAlarm = true);
+
     try {
       final response = await http.post(
         Uri.parse("${ApiConfig.baseUrl}/alarms"),
@@ -1401,6 +1496,10 @@ class _TaskScreenState extends State<TaskScreen> {
       }
     } catch (_) {
       showMessage("Server error while creating alarm");
+    } finally {
+      if (mounted) {
+        setState(() => isAddingAlarm = false);
+      }
     }
   }
 
@@ -1485,14 +1584,12 @@ class _TaskScreenState extends State<TaskScreen> {
           autoClockSync = data?["autoClockSync"] ?? true;
           archiveCompletedTasks = data?["archiveCompletedTasks"] ?? true;
           final incomingTimeFormat =
-            (data?["timeFormat"] ?? "12-hour").toString();
+              (data?["timeFormat"] ?? "12-hour").toString();
           final incomingReminderStyle =
-            (data?["reminderStyle"] ?? "full_screen").toString();
-          timeFormat =
-            incomingTimeFormat == "24-hour" ? "24-hour" : "12-hour";
-          reminderStyle = incomingReminderStyle == "banner"
-            ? "banner"
-            : "full_screen";
+              (data?["reminderStyle"] ?? "full_screen").toString();
+          timeFormat = incomingTimeFormat == "24-hour" ? "24-hour" : "12-hour";
+          reminderStyle =
+              incomingReminderStyle == "banner" ? "banner" : "full_screen";
         });
       } else if (response.statusCode == 401) {
         widget.onLogout();
@@ -1511,8 +1608,8 @@ class _TaskScreenState extends State<TaskScreen> {
       return;
     }
 
-    final isValidTime = RegExp(r"^([01]?\d|2[0-3]):([0-5]\d)$")
-        .hasMatch(dailySummaryTime);
+    final isValidTime =
+        RegExp(r"^([01]?\d|2[0-3]):([0-5]\d)$").hasMatch(dailySummaryTime);
     if (!isValidTime) {
       showMessage("Daily summary time must be HH:MM");
       return;
@@ -1679,6 +1776,7 @@ class _TaskScreenState extends State<TaskScreen> {
 
       if (response.statusCode == 503) {
         await Future.delayed(const Duration(milliseconds: 700));
+        await fetchDisplayPreview();
         response = await http.get(
           Uri.parse("${ApiConfig.baseUrl}/photos"),
           headers: authHeaders,
@@ -1688,9 +1786,8 @@ class _TaskScreenState extends State<TaskScreen> {
       if (response.statusCode == 200) {
         final body = json.decode(response.body);
         final List<dynamic> data = body["data"] ?? [];
-        final photoItems = data
-            .map((item) => PhotoItem.fromJson(item))
-            .toList();
+        final photoItems =
+            data.map((item) => PhotoItem.fromJson(item)).toList();
 
         final hasSelected = photoItems.any(
           (item) => item.id == selectedSinglePhotoId,
@@ -1725,8 +1822,8 @@ class _TaskScreenState extends State<TaskScreen> {
   }
 
   Future<void> uploadPhoto() async {
-    final picked = await imagePicker.pickImage(source: ImageSource.gallery);
-    if (picked == null) {
+    final pickedPhotos = await imagePicker.pickMultiImage(imageQuality: 90);
+    if (pickedPhotos.isEmpty) {
       return;
     }
 
@@ -1734,36 +1831,46 @@ class _TaskScreenState extends State<TaskScreen> {
     setState(() => isUploadingPhoto = true);
 
     try {
-      final bytes = await picked.readAsBytes();
-      if (bytes.isEmpty) {
-        showMessage("Selected image is empty");
-        return;
-      }
-
-      final fileName = picked.name.isNotEmpty
-          ? picked.name
-          : "photo_${DateTime.now().millisecondsSinceEpoch}.jpg";
-
       final request = http.MultipartRequest(
         "POST",
         Uri.parse("${ApiConfig.baseUrl}/photos/upload"),
       );
 
       request.headers["Authorization"] = "Bearer ${widget.token}";
-      request.files.add(
-        http.MultipartFile.fromBytes(
-          "photo",
-          bytes,
-          filename: fileName,
-        ),
-      );
+
+      for (final picked in pickedPhotos) {
+        final bytes = await picked.readAsBytes();
+        if (bytes.isEmpty) {
+          continue;
+        }
+
+        final fileName = picked.name.isNotEmpty
+            ? picked.name
+            : "photo_${DateTime.now().millisecondsSinceEpoch}.jpg";
+
+        request.files.add(
+          http.MultipartFile.fromBytes(
+            "photos",
+            bytes,
+            filename: fileName,
+          ),
+        );
+      }
+
+      if (request.files.isEmpty) {
+        showMessage("Selected images are empty");
+        return;
+      }
 
       final streamed = await request.send();
       final response = await http.Response.fromStream(streamed);
 
       if (response.statusCode == 201) {
         await fetchPhotos();
-        showMessage("Photo uploaded");
+        await fetchDisplayPreview();
+        final body = json.decode(response.body) as Map<String, dynamic>;
+        final count = (body["count"] ?? 1) as int? ?? 1;
+        showMessage(count > 1 ? "$count photos uploaded" : "Photo uploaded");
       } else if (response.statusCode == 401) {
         widget.onLogout();
       } else {
@@ -1804,12 +1911,14 @@ class _TaskScreenState extends State<TaskScreen> {
 
     try {
       final isArchivedView = selectedView == "archived";
-      final response = await http.get(
-        Uri.parse(
-          "${ApiConfig.baseUrl}/tasks?archived=${isArchivedView ? "true" : "false"}",
-        ),
-        headers: authHeaders,
-      ).timeout(const Duration(seconds: 30));
+      final response = await http
+          .get(
+            Uri.parse(
+              "${ApiConfig.baseUrl}/tasks?archived=${isArchivedView ? "true" : "false"}",
+            ),
+            headers: authHeaders,
+          )
+          .timeout(const Duration(seconds: 30));
 
       if (response.statusCode == 200) {
         final body = json.decode(response.body);
@@ -1844,6 +1953,9 @@ class _TaskScreenState extends State<TaskScreen> {
       return;
     }
 
+    if (!mounted) return;
+    setState(() => isAddingTask = true);
+
     try {
       final response = await http.post(
         Uri.parse("${ApiConfig.baseUrl}/tasks"),
@@ -1862,6 +1974,7 @@ class _TaskScreenState extends State<TaskScreen> {
         dateController.clear();
         timeController.clear();
         await fetchTasks();
+        await fetchDisplayPreview();
       } else if (response.statusCode == 401) {
         widget.onLogout();
       } else {
@@ -1870,6 +1983,10 @@ class _TaskScreenState extends State<TaskScreen> {
       }
     } catch (_) {
       showMessage("Server error while adding task");
+    } finally {
+      if (mounted) {
+        setState(() => isAddingTask = false);
+      }
     }
   }
 
@@ -2147,7 +2264,7 @@ class _TaskScreenState extends State<TaskScreen> {
       {"label": "Settings", "icon": Icons.settings_rounded},
       {"label": "Sign out", "icon": Icons.logout_rounded},
     ];
-    
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
@@ -2170,16 +2287,22 @@ class _TaskScreenState extends State<TaskScreen> {
           final tabIcon = tab["icon"] as IconData;
           final isSignOutTab = tabLabel == "Sign out";
           final selected = !isSignOutTab && selectedDashboardTab == index;
-          
+
           final tabBackgroundColor = selected
               ? const Color(0xFF0D9488)
-              : (isSignOutTab ? const Color(0xFFFEE2E2) : const Color(0xFFF3F4F6));
+              : (isSignOutTab
+                  ? const Color(0xFFFEE2E2)
+                  : const Color(0xFFF3F4F6));
           final tabTextColor = selected
               ? Colors.white
-              : (isSignOutTab ? const Color(0xFFDC2626) : const Color(0xFF374151));
+              : (isSignOutTab
+                  ? const Color(0xFFDC2626)
+                  : const Color(0xFF374151));
           final tabIconColor = selected
               ? Colors.white
-              : (isSignOutTab ? const Color(0xFFDC2626) : const Color(0xFF6B7280));
+              : (isSignOutTab
+                  ? const Color(0xFFDC2626)
+                  : const Color(0xFF6B7280));
 
           return Material(
             color: Colors.transparent,
@@ -2193,7 +2316,8 @@ class _TaskScreenState extends State<TaskScreen> {
                 setState(() => selectedDashboardTab = index);
               },
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                 decoration: BoxDecoration(
                   color: tabBackgroundColor,
                   borderRadius: BorderRadius.circular(14),
@@ -2214,7 +2338,8 @@ class _TaskScreenState extends State<TaskScreen> {
                       tabLabel,
                       style: TextStyle(
                         color: tabTextColor,
-                        fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+                        fontWeight:
+                            selected ? FontWeight.w700 : FontWeight.w600,
                         fontSize: 13,
                       ),
                     ),
@@ -2231,7 +2356,8 @@ class _TaskScreenState extends State<TaskScreen> {
   Widget buildDeviceDisplayCard() {
     final modeLabel = previewModeTitle.toUpperCase();
     final hasImage = previewImageUrl.isNotEmpty;
-    final isReminderStyle = previewModeTitle == "Reminder" || previewModeTitle == "Alarm";
+    final isReminderStyle =
+        previewModeTitle == "Reminder" || previewModeTitle == "Alarm";
 
     return Card(
       elevation: 0,
@@ -2324,7 +2450,10 @@ class _TaskScreenState extends State<TaskScreen> {
                             border: Border.all(color: const Color(0xFF334155)),
                             gradient: !hasImage
                                 ? const LinearGradient(
-                                    colors: [Color(0xFF0F172A), Color(0xFF1E293B)],
+                                    colors: [
+                                      Color(0xFF0F172A),
+                                      Color(0xFF1E293B)
+                                    ],
                                   )
                                 : null,
                           ),
@@ -2366,7 +2495,8 @@ class _TaskScreenState extends State<TaskScreen> {
                             decoration: BoxDecoration(
                               color: const Color(0xCC0F172A),
                               borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: const Color(0x475A6A81)),
+                              border:
+                                  Border.all(color: const Color(0x475A6A81)),
                             ),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -2532,11 +2662,6 @@ class _TaskScreenState extends State<TaskScreen> {
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
                   title: const Text("Enable slideshow mode"),
-                  subtitle: Text(
-                    slideshowEnabled
-                        ? "Photos rotate automatically"
-                        : "Only one selected image will be shown",
-                  ),
                   value: slideshowEnabled,
                   onChanged: (value) async {
                     setState(() => slideshowEnabled = value);
@@ -2545,23 +2670,44 @@ class _TaskScreenState extends State<TaskScreen> {
                 ),
                 if (slideshowEnabled) ...[
                   const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: slideshowIntervalController,
-                          keyboardType: TextInputType.number,
-                          decoration: const InputDecoration(
-                            labelText: "Slideshow interval (sec)",
-                          ),
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      final isNarrow = constraints.maxWidth < 420;
+
+                      final intervalField = TextField(
+                        controller: slideshowIntervalController,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(
+                          labelText: "Slideshow interval (sec)",
+                          helperText: "Time between slideshow images",
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      FilledButton(
-                        onPressed: saveSettings,
-                        child: const Text("Save"),
-                      ),
-                    ],
+                      );
+
+                      if (isNarrow) {
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            intervalField,
+                            const SizedBox(height: 8),
+                            FilledButton(
+                              onPressed: saveSettings,
+                              child: const Text("Save"),
+                            ),
+                          ],
+                        );
+                      }
+
+                      return Row(
+                        children: [
+                          Expanded(child: intervalField),
+                          const SizedBox(width: 8),
+                          FilledButton(
+                            onPressed: saveSettings,
+                            child: const Text("Save"),
+                          ),
+                        ],
+                      );
+                    },
                   ),
                 ],
                 if (!slideshowEnabled) ...[
@@ -2571,9 +2717,10 @@ class _TaskScreenState extends State<TaskScreen> {
                     key: ValueKey(
                       "single-image-${photos.length}-$selectedSinglePhotoId",
                     ),
-                    initialValue: photos.any((p) => p.id == selectedSinglePhotoId)
-                        ? selectedSinglePhotoId
-                        : null,
+                    initialValue:
+                        photos.any((p) => p.id == selectedSinglePhotoId)
+                            ? selectedSinglePhotoId
+                            : null,
                     items: photos
                         .map(
                           (photo) => DropdownMenuItem<String>(
@@ -2602,14 +2749,23 @@ class _TaskScreenState extends State<TaskScreen> {
                     },
                     onChanged: photos.isEmpty
                         ? null
-                        : (value) async {
+                        : (value) {
                             setState(() {
                               selectedSinglePhotoId = value ?? "";
                             });
-                            await saveSettings(showSuccess: false);
                           },
                     decoration: const InputDecoration(
                       labelText: "Select single image for display",
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton(
+                      onPressed: photos.isEmpty || selectedSinglePhotoId.isEmpty
+                          ? null
+                          : saveSettings,
+                      child: const Text("Save"),
                     ),
                   ),
                 ],
@@ -2622,24 +2778,24 @@ class _TaskScreenState extends State<TaskScreen> {
             icon: Icons.image_outlined,
             child: Column(
               children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: fetchPhotos,
-                        child: const Text("Refresh"),
-                      ),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    onPressed: isUploadingPhoto ? null : uploadPhoto,
+                    child: _buttonContent(
+                      "Upload Photos",
+                      icon: Icons.upload,
+                      isLoading: isUploadingPhoto,
                     ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: FilledButton(
-                        onPressed: isUploadingPhoto ? null : uploadPhoto,
-                        child: Text(
-                          isUploadingPhoto ? "Uploading..." : "Upload",
-                        ),
-                      ),
-                    ),
-                  ],
+                  ),
+                ),
+                const SizedBox(height: 8),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton(
+                    onPressed: fetchPhotos,
+                    child: const Text("Refresh"),
+                  ),
                 ),
                 const SizedBox(height: 10),
                 SizedBox(
@@ -2673,7 +2829,8 @@ class _TaskScreenState extends State<TaskScreen> {
                                           fit: BoxFit.cover,
                                           errorBuilder: (_, __, ___) {
                                             return const Center(
-                                              child: Text("Preview unavailable"),
+                                              child:
+                                                  Text("Preview unavailable"),
                                             );
                                           },
                                         ),
@@ -2767,14 +2924,12 @@ class _TaskScreenState extends State<TaskScreen> {
                 const SizedBox(height: 12),
                 SizedBox(
                   width: double.infinity,
-                  child: FilledButton.icon(
-                    onPressed: addTask,
-                    icon: const Icon(Icons.add_task),
-                    label: const Text("Add Task"),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: const Color(0xFF0D9488),
-                      foregroundColor: Colors.white,
-                      minimumSize: const Size.fromHeight(48),
+                  child: FilledButton(
+                    onPressed: isAddingTask ? null : addTask,
+                    child: _buttonContent(
+                      "Add Task",
+                      icon: Icons.add_task,
+                      isLoading: isAddingTask,
                     ),
                   ),
                 ),
@@ -2875,8 +3030,7 @@ class _TaskScreenState extends State<TaskScreen> {
 
                               return Card(
                                 elevation: 1,
-                                margin:
-                                    const EdgeInsets.symmetric(vertical: 8),
+                                margin: const EdgeInsets.symmetric(vertical: 8),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(18),
                                 ),
@@ -2926,7 +3080,8 @@ class _TaskScreenState extends State<TaskScreen> {
                                           const SizedBox(width: 10),
                                           Chip(
                                             label: Text(statusText),
-                                            backgroundColor: statusColor.withValues(alpha: 0.12),
+                                            backgroundColor: statusColor
+                                                .withValues(alpha: 0.12),
                                             labelStyle: TextStyle(
                                               color: statusColor,
                                               fontWeight: FontWeight.w600,
@@ -2991,27 +3146,35 @@ class _TaskScreenState extends State<TaskScreen> {
           children: [
             TextField(
               controller: alarmLabelController,
-              decoration: const InputDecoration(labelText: "Alarm label"),
+              decoration: const InputDecoration(labelText: "Label"),
             ),
             const SizedBox(height: 8),
-            TextField(
-              controller: alarmDateController,
-              readOnly: selectedRecurrence == "daily",
-              onTap: selectedRecurrence == "daily" ? null : pickAlarmDate,
-              decoration: const InputDecoration(
-                labelText: "Alarm date",
-                suffixIcon: Icon(Icons.calendar_month),
-              ),
-            ),
-            const SizedBox(height: 8),
-            TextField(
-              controller: alarmTimeController,
-              readOnly: true,
-              onTap: pickAlarmTime,
-              decoration: const InputDecoration(
-                labelText: "Alarm time",
-                suffixIcon: Icon(Icons.schedule),
-              ),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: alarmDateController,
+                    readOnly: selectedRecurrence == "daily",
+                    onTap: selectedRecurrence == "daily" ? null : pickAlarmDate,
+                    decoration: const InputDecoration(
+                      labelText: "Date",
+                      suffixIcon: Icon(Icons.calendar_month),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: TextField(
+                    controller: alarmTimeController,
+                    readOnly: true,
+                    onTap: pickAlarmTime,
+                    decoration: const InputDecoration(
+                      labelText: "Time",
+                      suffixIcon: Icon(Icons.schedule),
+                    ),
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 8),
             DropdownButtonFormField<String>(
@@ -3030,20 +3193,24 @@ class _TaskScreenState extends State<TaskScreen> {
               },
             ),
             const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              children: [
-                FilledButton(
-                  onPressed: addAlarm,
-                  child: const Text("Add Alarm"),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: isAddingAlarm ? null : addAlarm,
+                child: _buttonContent(
+                  "Add Alarm",
+                  icon: Icons.alarm_add,
+                  isLoading: isAddingAlarm,
                 ),
-                TextButton(
-                  onPressed: fetchAlarms,
-                  child: const Text("Refresh"),
-                ),
-              ],
+              ),
+            ),
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton(
+                onPressed: fetchAlarms,
+                child: const Text("Refresh"),
+              ),
             ),
             const SizedBox(height: 8),
             alarms.isEmpty
@@ -3057,8 +3224,8 @@ class _TaskScreenState extends State<TaskScreen> {
                     itemCount: alarms.length,
                     itemBuilder: (context, index) {
                       final alarm = alarms[index];
-                      final formattedLabel =
-                          _normalizeAlarmLabel(alarm.label.isEmpty ? "Alarm" : alarm.label);
+                      final formattedLabel = _normalizeAlarmLabel(
+                          alarm.label.isEmpty ? "Alarm" : alarm.label);
                       final datePart =
                           alarm.recurrence == "daily" ? "Daily" : alarm.date;
                       final timePart = formatTimeByPreference(alarm.time);
@@ -3118,7 +3285,7 @@ class _TaskScreenState extends State<TaskScreen> {
                               ),
                               const SizedBox(height: 8),
                               Text(
-                                "$datePart • $timePart",
+                                "$datePart ��� $timePart",
                                 style: const TextStyle(
                                   color: Color(0xFF6B7280),
                                   fontWeight: FontWeight.w500,
@@ -3292,7 +3459,8 @@ class _TaskScreenState extends State<TaskScreen> {
                       key: ValueKey("time-format-$timeFormat"),
                       isExpanded: true,
                       initialValue: timeFormat,
-                      decoration: const InputDecoration(labelText: "Time format"),
+                      decoration:
+                          const InputDecoration(labelText: "Time format"),
                       items: const [
                         DropdownMenuItem(
                           value: "12-hour",
@@ -3425,11 +3593,11 @@ class _TaskScreenState extends State<TaskScreen> {
                           if (value != upper) {
                             deleteAccountConfirmController.value =
                                 deleteAccountConfirmController.value.copyWith(
-                                  text: upper,
-                                  selection: TextSelection.collapsed(
-                                    offset: upper.length,
-                                  ),
-                                );
+                              text: upper,
+                              selection: TextSelection.collapsed(
+                                offset: upper.length,
+                              ),
+                            );
                           }
                           setState(() {});
                         },
@@ -3499,7 +3667,12 @@ class _TaskScreenState extends State<TaskScreen> {
           bottom: false,
           child: LayoutBuilder(
             builder: (context, constraints) {
-              final titleSize = constraints.maxWidth < 420 ? 30.0 : 36.0;
+              final compactTitleSize = constraints.maxWidth < 420 ? 24.0 : 28.0;
+              final compactGreetingSize =
+                  constraints.maxWidth < 420 ? 16.0 : 18.0;
+              final compactMessageSize =
+                  constraints.maxWidth < 420 ? 12.0 : 13.0;
+              final compactTimeSize = constraints.maxWidth < 420 ? 13.0 : 14.0;
 
               return SingleChildScrollView(
                 padding: const EdgeInsets.fromLTRB(20, 18, 20, 8),
@@ -3507,7 +3680,7 @@ class _TaskScreenState extends State<TaskScreen> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Container(
-                      padding: const EdgeInsets.all(24),
+                      padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
                           begin: Alignment.topLeft,
@@ -3520,7 +3693,8 @@ class _TaskScreenState extends State<TaskScreen> {
                         borderRadius: BorderRadius.circular(24),
                         boxShadow: [
                           BoxShadow(
-                            color: const Color(0xFF0D9488).withValues(alpha: 0.15),
+                            color:
+                                const Color(0xFF0D9488).withValues(alpha: 0.15),
                             blurRadius: 20,
                             offset: const Offset(0, 8),
                           ),
@@ -3533,23 +3707,24 @@ class _TaskScreenState extends State<TaskScreen> {
                             "Smart Task Manager",
                             textAlign: TextAlign.center,
                             style: TextStyle(
-                              fontSize: titleSize,
-                              height: 1.05,
+                              fontSize: compactTitleSize,
+                              height: 1.0,
                               fontWeight: FontWeight.w900,
                               color: Colors.white,
                               letterSpacing: 0.5,
                             ),
                           ),
-                          const SizedBox(height: 18),
-                          // Greeting with emoji
+                          const SizedBox(height: 10),
+                          // Greeting with time-based icon
                           Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(
-                                _getGreetingEmoji(),
-                                style: const TextStyle(fontSize: 32),
+                              Icon(
+                                _getGreetingIcon(),
+                                size: 24,
+                                color: Colors.white,
                               ),
-                              const SizedBox(width: 12),
+                              const SizedBox(width: 10),
                               Expanded(
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -3558,23 +3733,24 @@ class _TaskScreenState extends State<TaskScreen> {
                                       "${_timeGreeting()}, ${_userDisplayName()}!",
                                       maxLines: 2,
                                       overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(
+                                      style: TextStyle(
                                         fontWeight: FontWeight.w900,
-                                        fontSize: 20,
+                                        fontSize: compactGreetingSize,
                                         color: Colors.white,
-                                        height: 1.2,
+                                        height: 1.15,
                                       ),
                                     ),
-                                    const SizedBox(height: 6),
+                                    const SizedBox(height: 4),
                                     Text(
                                       _getGreetingMessage(),
                                       maxLines: 2,
                                       overflow: TextOverflow.ellipsis,
                                       style: TextStyle(
                                         fontWeight: FontWeight.w500,
-                                        fontSize: 13,
-                                        color: Colors.white.withValues(alpha: 0.85),
-                                        height: 1.3,
+                                        fontSize: compactMessageSize,
+                                        color: Colors.white
+                                            .withValues(alpha: 0.85),
+                                        height: 1.25,
                                       ),
                                     ),
                                   ],
@@ -3582,12 +3758,12 @@ class _TaskScreenState extends State<TaskScreen> {
                               ),
                             ],
                           ),
-                          const SizedBox(height: 16),
+                          const SizedBox(height: 10),
                           // Time and separator
                           Container(
                             padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 10,
+                              horizontal: 10,
+                              vertical: 8,
                             ),
                             decoration: BoxDecoration(
                               color: Colors.white.withValues(alpha: 0.1),
@@ -3606,10 +3782,10 @@ class _TaskScreenState extends State<TaskScreen> {
                                 const SizedBox(width: 8),
                                 Text(
                                   headerTimeText,
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     color: Colors.white,
                                     fontWeight: FontWeight.w700,
-                                    fontSize: 15,
+                                    fontSize: compactTimeSize,
                                     letterSpacing: 0.3,
                                   ),
                                 ),
@@ -3729,11 +3905,10 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         setState(() => emailError = message);
       }
     } on TimeoutException {
-      setState(() =>
-          emailError = "Request timed out. Please try again.");
+      setState(() => emailError = "Request timed out. Please try again.");
     } on Exception {
-      setState(() =>
-          emailError = "No internet connection or server unreachable.");
+      setState(
+          () => emailError = "No internet connection or server unreachable.");
     } catch (_) {
       setState(() => emailError = "Server error. Please try again later.");
     } finally {
@@ -4185,8 +4360,8 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
       setState(() => newPasswordError = "New password is required");
       hasError = true;
     } else if (newPassword.length < 6) {
-      setState(() =>
-          newPasswordError = "Password must be at least 6 characters");
+      setState(
+          () => newPasswordError = "Password must be at least 6 characters");
       hasError = true;
     }
 
@@ -4196,8 +4371,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
     }
 
     if (newPassword != confirmPassword) {
-      setState(() =>
-          confirmPasswordError = "Passwords do not match");
+      setState(() => confirmPasswordError = "Passwords do not match");
       hasError = true;
     }
 
@@ -4225,7 +4399,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
       if (response.statusCode == 200) {
         setState(() =>
             successMessage = "Password reset successfully! Redirecting...");
-        
+
         await Future.delayed(const Duration(seconds: 2));
         if (mounted) {
           Navigator.pop(context);
@@ -4237,11 +4411,10 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
         setState(() => generalError = message);
       }
     } on TimeoutException {
-      setState(() =>
-          generalError = "Request timed out. Please try again.");
+      setState(() => generalError = "Request timed out. Please try again.");
     } on Exception {
-      setState(() =>
-          generalError = "No internet connection or server unreachable.");
+      setState(
+          () => generalError = "No internet connection or server unreachable.");
     } catch (_) {
       setState(() => generalError = "Server error. Please try again later.");
     } finally {
@@ -4302,7 +4475,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                       ),
                     ),
                     child: Text(
-                      "✓ $successMessage",
+                      "ԣ� $successMessage",
                       style: const TextStyle(
                         color: Color(0xFF059669),
                         fontWeight: FontWeight.w600,

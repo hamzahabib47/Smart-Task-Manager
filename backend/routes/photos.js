@@ -89,7 +89,10 @@ router.get("/photos/:id/file", async (req, res) => {
 router.use("/photos", authMiddleware);
 
 router.post("/photos/upload", (req, res) => {
-  upload.single("photo")(req, res, async (uploadError) => {
+  upload.fields([
+    { name: "photos", maxCount: 10 },
+    { name: "photo", maxCount: 1 },
+  ])(req, res, async (uploadError) => {
     try {
       if (uploadError instanceof multer.MulterError) {
         if (uploadError.code === "LIMIT_FILE_SIZE") {
@@ -112,35 +115,47 @@ router.post("/photos/upload", (req, res) => {
         });
       }
 
-      if (!req.file) {
+      const filesMap = req.files || {};
+      const multiFiles = Array.isArray(filesMap.photos) ? filesMap.photos : [];
+      const singleFiles = Array.isArray(filesMap.photo) ? filesMap.photo : [];
+      const uploadedFiles = [...multiFiles, ...singleFiles];
+
+      if (!uploadedFiles.length) {
         return res.status(400).json({
           success: false,
-          message: "photo file is required",
+          message: "At least one photo file is required",
         });
       }
 
-      const safeName = (req.file.originalname || "photo.jpg").replace(
-        /[^a-zA-Z0-9._-]/g,
-        "_"
-      );
+      const createdPhotos = [];
 
-      const photoId = new mongoose.Types.ObjectId();
-      const photo = await Photo.create({
-        _id: photoId,
-        user: req.user.id,
-        filename: `${Date.now()}_${safeName}`,
-        url: `/api/photos/${photoId}/file`,
-        mimeType: req.file.mimetype || "image/jpeg",
-        dataBase64: req.file.buffer.toString("base64"),
-      });
+      for (const file of uploadedFiles) {
+        const safeName = (file.originalname || "photo.jpg").replace(
+          /[^a-zA-Z0-9._-]/g,
+          "_"
+        );
+
+        const photoId = new mongoose.Types.ObjectId();
+        const photo = await Photo.create({
+          _id: photoId,
+          user: req.user.id,
+          filename: `${Date.now()}_${safeName}`,
+          url: `/api/photos/${photoId}/file`,
+          mimeType: file.mimetype || "image/jpeg",
+          dataBase64: file.buffer.toString("base64"),
+        });
+
+        createdPhotos.push(photo);
+      }
 
       // Emit real-time update event
-      emitUpdate(req, { type: "photo", action: "uploaded", data: photo });
+      emitUpdate(req, { type: "photo", action: "uploaded", data: createdPhotos });
 
       return res.status(201).json({
         success: true,
-        message: "Photo uploaded",
-        data: photo,
+        message: createdPhotos.length === 1 ? "Photo uploaded" : "Photos uploaded",
+        count: createdPhotos.length,
+        data: createdPhotos,
       });
     } catch (error) {
       return res.status(500).json({

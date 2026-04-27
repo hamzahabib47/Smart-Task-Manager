@@ -6,38 +6,47 @@
     <title>Smart Task Manager Display</title>
     <link rel="stylesheet" href="styles.css" />
   </head>
-  <body>
+  <body class="app-loading">
+    <div class="loading-shell" aria-hidden="true">
+      <div class="loading-card">
+        <div class="loading-brand">SMART TASK MANAGER</div>
+        <div class="loading-line loading-line-lg"></div>
+        <div class="loading-line loading-line-md"></div>
+        <div class="loading-grid">
+          <div class="loading-tile"></div>
+          <div class="loading-tile"></div>
+          <div class="loading-tile"></div>
+        </div>
+        <div class="loading-note">Preparing display...</div>
+      </div>
+    </div>
     <main class="screen mode-slideshow" id="screen">
       <header class="topbar">
         <div class="brand">SMART TASK MANAGER</div>
         <div class="status-cluster">
-          <span id="countdownBadge" class="badge badge-countdown hidden"
-            >Auto close in 30s</span
-          >
-          <span id="clockBadge" class="badge badge-clock">--:--:--</span>
+          <span id="countdownBadge" class="badge badge-countdown hidden"></span>
+          <span id="clockBadge" class="badge badge-clock"></span>
         </div>
       </header>
 
       <section class="stage" id="stage">
         <img id="heroImage" class="hero-image hidden" alt="Display visual" />
 
-        <div id="emptyDisplayMessage" class="empty-display-message hidden">
-          Add Images from mobile app to show on the display
-        </div>
+        <div id="emptyDisplayMessage" class="empty-display-message hidden"></div>
 
         <article class="content-card" id="contentCard">
-          <h1 id="primaryText">NO UPCOMING TASK</h1>
-          <p id="secondaryText">Waiting for upcoming tasks.</p>
+          <h1 id="primaryText"></h1>
+          <p id="secondaryText"></p>
           <div class="meta-row">
-            <span id="timeText" class="meta-pill">--:--</span>
-            <span id="hintText" class="meta-pill">Display active</span>
+            <span id="timeText" class="meta-pill"></span>
+            <span id="hintText" class="meta-pill"></span>
           </div>
         </article>
       </section>
 
       <aside id="bannerStrip" class="banner-strip hidden">
-        <p id="bannerTitle" class="banner-title">Reminder</p>
-        <p id="bannerSubtitle" class="banner-subtitle">Task reminder active</p>
+        <p id="bannerTitle" class="banner-title"></p>
+        <p id="bannerSubtitle" class="banner-subtitle"></p>
       </aside>
 
       <button id="fullscreenBtn" class="fullscreen-btn" title="Toggle fullscreen">

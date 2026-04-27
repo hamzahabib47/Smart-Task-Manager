@@ -1,76 +1,98 @@
 # Smart Task Manager
 
-Smart Task Manager is a multi-client scheduling system with:
+Smart Task Manager is a full-stack scheduling and display system featuring:
 
-1. Backend API (Node.js + Express + MongoDB)
-2. Mobile controller app (Flutter)
-3. Display web app (HTML/CSS/JS)
+1. **Backend API** (Node.js + Express + MongoDB)
+2. **Mobile Controller App** (Flutter)
+3. **Display Web App** (HTML/CSS/JS with realtime updates)
 
-The mobile app controls tasks, alarms, photos, settings, and account actions.
-The display web app shows the live state (slideshow, upcoming task, reminder, alarm).
+The mobile app manages tasks, alarms, photos, and settings. The display web app shows live state in slideshow, single image, upcoming task, reminder, or alarm modes—updated in real-time with zero manual refresh.
 
 ## Architecture
 
-Mobile App -> REST API -> MongoDB -> Display Web App
+```
+Mobile App (Flutter)
+      ↓ REST + Realtime
+Backend API (Node.js/Express/Mongoose)
+      ↓ Realtime Events
+Display Web App (JS/HTML/CSS)
+```
 
 ## Project Structure
 
 ```
-stm/
-  backend/
-    config/
-    middleware/
-    models/
-    routes/
-    services/
-    uploads/
-    package.json
-    server.js
-  mobile_app/
-    lib/
-      main.dart
-    pubspec.yaml
-  web_display/
-    index.html
-    styles.css
-    app.js
-  README.md
+Smart-Task-Manager/
+  ├── backend/
+  │   ├── config/
+  │   ├── middleware/
+  │   ├── models/
+  │   ├── routes/
+  │   ├── services/
+  │   ├── package.json
+  │   └── server.js
+  ├── mobile_app/
+  │   ├── lib/
+  │   │   └── main.dart
+  │   ├── pubspec.yaml
+  │   └── README.md
+  ├── web_display/
+  │   ├── index.html
+  │   ├── styles.css
+  │   ├── app.js
+  │   └── README.md
+  └── README.md
 ```
-
 
 ## Key Features
 
-### Auth and Account
+### Mobile App
 
-- Register with required name, email, password
-- Sign in with field-specific errors:
-  - incorrect email
-  - incorrect password
+**Authentication & Account**
+- Register and sign-in with field-specific validation
 - Change user name from Settings
-- Delete account with strict confirmation text
+- Account deletion with strict confirmation
 
-### Tasks and Alarms
-
+**Tasks & Alarms**
 - Create, edit, complete, archive, dismiss tasks
-- Create one-time or daily alarms
-- Stop/toggle/delete alarms
-- Time format support (12-hour / 24-hour)
+- One-time or daily alarms with visual indicators
+- Stop/toggle/delete alarms with ringing state
+- 12-hour and 24-hour time format support
+- Compact form layouts for minimal overflow
 
-### Display Behavior
+**Photos & Display Control**
+- Multi-image upload support (upload multiple photos at once)
+- Slideshow mode with adjustable interval
+- Single-image mode with explicit Save button
+- Real-time preview of display state in-app
 
-- Modes: slideshow, single image, upcoming, reminder, alarm
-- Reminder style setting:
-  - full screen
-  - banner
-- Auto close countdown for reminder/alarm
-- Empty image state center message:
-  - "Add Images from mobile app to show on the display"
-- Full image visibility using contain-fit (no crop)
+**User Experience**
+- Time-based greeting with weather-aware icons
+- Unified button styling across all sections
+- Loading spinners on async operations (Add Task, Add Alarm, Upload Photos)
+- Responsive UI with proper spacing
 
-### Mobile Display Tab Preview
+### Display Web App
 
-- Mirrors live display behavior and mode content
-- Shows matching primary text, meta info, banner state, and empty-image message
+**Display Modes**
+- **Slideshow**: Auto-rotating uploaded photos
+- **Single Image**: User-selected static image
+- **Upcoming**: Next scheduled task with meta info
+- **Reminder**: Task reminder in full-screen or banner style
+- **Alarm**: Active alarm with recurrence and countdown
+
+**Real-Time Features**
+- Instant updates via Pusher, Socket.IO, or SSE
+- Minute-boundary auto-refresh for time-based state transitions
+- Tab focus/visibility awareness (refresh on tab return)
+- Auto-dismiss countdown with visual countdown badge
+- Banner alerts for reminder/alarm states
+
+**User Experience**
+- Loading skeleton during JS initialization (no blank flash)
+- Smooth transitions between display modes
+- Full-screen image containment (no crop)
+- Meta info with compact styling
+- Graceful error states
 
 ## Environment Variables (Backend)
 
