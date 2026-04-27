@@ -2670,23 +2670,44 @@ class _TaskScreenState extends State<TaskScreen> {
                 ),
                 if (slideshowEnabled) ...[
                   const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: slideshowIntervalController,
-                          keyboardType: TextInputType.number,
-                          decoration: const InputDecoration(
-                            labelText: "Slideshow interval (sec)",
-                          ),
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      final isNarrow = constraints.maxWidth < 420;
+
+                      final intervalField = TextField(
+                        controller: slideshowIntervalController,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(
+                          labelText: "Slideshow interval (sec)",
+                          helperText: "Time between slideshow images",
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      FilledButton(
-                        onPressed: saveSettings,
-                        child: const Text("Save"),
-                      ),
-                    ],
+                      );
+
+                      if (isNarrow) {
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            intervalField,
+                            const SizedBox(height: 8),
+                            FilledButton(
+                              onPressed: saveSettings,
+                              child: const Text("Save"),
+                            ),
+                          ],
+                        );
+                      }
+
+                      return Row(
+                        children: [
+                          Expanded(child: intervalField),
+                          const SizedBox(width: 8),
+                          FilledButton(
+                            onPressed: saveSettings,
+                            child: const Text("Save"),
+                          ),
+                        ],
+                      );
+                    },
                   ),
                 ],
                 if (!slideshowEnabled) ...[
