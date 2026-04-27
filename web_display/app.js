@@ -234,6 +234,14 @@ let countdownTimer = null;
 let countdownDeadlineMs = null;
 let countdownContextKey = "";
 let autoDismissInFlight = false;
+let appReady = false;
+
+function markAppReady() {
+  if (appReady) return;
+  appReady = true;
+  document.body.classList.remove("app-loading");
+  document.body.classList.add("app-ready");
+}
 
 const SCREEN_MODES = [
   "mode-slideshow",
@@ -577,6 +585,7 @@ async function loadDisplayState({ forceRefresh = false } = {}) {
     if (cachedResult) {
       console.log("Serving from cache");
       await renderDisplayState(cachedResult);
+      markAppReady();
       return;
     }
   }
@@ -599,12 +608,14 @@ async function loadDisplayState({ forceRefresh = false } = {}) {
     lastDisplayStateTimestamp = Date.now();
     
     await renderDisplayState(result);
+    markAppReady();
   } catch (error) {
     console.error("Error loading display state:", error);
     renderDisplayState({
       success: false,
       mode: "error",
     });
+    markAppReady();
   } finally {
     displayStateInFlight = false;
   }

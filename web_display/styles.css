@@ -13,6 +13,18 @@ body {
   color: #f8fafc;
 }
 
+body.app-loading {
+  overflow: hidden;
+}
+
+body.app-loading .screen {
+  visibility: hidden;
+}
+
+body.app-ready .screen {
+  visibility: visible;
+}
+
 .screen {
   width: 100%;
   height: 100%;
