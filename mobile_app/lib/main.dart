@@ -2679,14 +2679,23 @@ class _TaskScreenState extends State<TaskScreen> {
                     },
                     onChanged: photos.isEmpty
                         ? null
-                        : (value) async {
+                        : (value) {
                             setState(() {
                               selectedSinglePhotoId = value ?? "";
                             });
-                            await saveSettings(showSuccess: false);
                           },
                     decoration: const InputDecoration(
                       labelText: "Select single image for display",
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton(
+                      onPressed: photos.isEmpty || selectedSinglePhotoId.isEmpty
+                          ? null
+                          : saveSettings,
+                      child: const Text("Save"),
                     ),
                   ),
                 ],
