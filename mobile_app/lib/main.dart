@@ -1039,10 +1039,10 @@ class _TaskScreenState extends State<TaskScreen> {
 
   String _getGreetingEmoji() {
     final hour = DateTime.now().hour;
-    if (hour >= 5 && hour < 12) return "🌅";
-    if (hour >= 12 && hour < 17) return "☀️";
-    if (hour >= 17 && hour < 21) return "🌆";
-    return "🌙";
+    if (hour >= 5 && hour < 12) return "����";
+    if (hour >= 12 && hour < 17) return "��Ǵ��";
+    if (hour >= 17 && hour < 21) return "����";
+    return "����";
   }
 
   String _getGreetingMessage() {
@@ -3076,27 +3076,35 @@ class _TaskScreenState extends State<TaskScreen> {
           children: [
             TextField(
               controller: alarmLabelController,
-              decoration: const InputDecoration(labelText: "Alarm label"),
+              decoration: const InputDecoration(labelText: "Label"),
             ),
             const SizedBox(height: 8),
-            TextField(
-              controller: alarmDateController,
-              readOnly: selectedRecurrence == "daily",
-              onTap: selectedRecurrence == "daily" ? null : pickAlarmDate,
-              decoration: const InputDecoration(
-                labelText: "Alarm date",
-                suffixIcon: Icon(Icons.calendar_month),
-              ),
-            ),
-            const SizedBox(height: 8),
-            TextField(
-              controller: alarmTimeController,
-              readOnly: true,
-              onTap: pickAlarmTime,
-              decoration: const InputDecoration(
-                labelText: "Alarm time",
-                suffixIcon: Icon(Icons.schedule),
-              ),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: alarmDateController,
+                    readOnly: selectedRecurrence == "daily",
+                    onTap: selectedRecurrence == "daily" ? null : pickAlarmDate,
+                    decoration: const InputDecoration(
+                      labelText: "Date",
+                      suffixIcon: Icon(Icons.calendar_month),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: TextField(
+                    controller: alarmTimeController,
+                    readOnly: true,
+                    onTap: pickAlarmTime,
+                    decoration: const InputDecoration(
+                      labelText: "Time",
+                      suffixIcon: Icon(Icons.schedule),
+                    ),
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 8),
             DropdownButtonFormField<String>(
@@ -3207,7 +3215,7 @@ class _TaskScreenState extends State<TaskScreen> {
                               ),
                               const SizedBox(height: 8),
                               Text(
-                                "$datePart • $timePart",
+                                "$datePart ��� $timePart",
                                 style: const TextStyle(
                                   color: Color(0xFF6B7280),
                                   fontWeight: FontWeight.w500,
@@ -4396,7 +4404,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                       ),
                     ),
                     child: Text(
-                      "✓ $successMessage",
+                      "ԣ� $successMessage",
                       style: const TextStyle(
                         color: Color(0xFF059669),
                         fontWeight: FontWeight.w600,
