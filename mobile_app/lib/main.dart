@@ -291,8 +291,8 @@ class _AnimatedDotsLoaderState extends State<AnimatedDotsLoader>
   void initState() {
     super.initState();
     _controller = AnimationController(
-      duration: const Duration(milliseconds: 1200),
       vsync: this,
+      duration: const Duration(milliseconds: 1200),
     )..repeat();
   }
 
@@ -2613,7 +2613,6 @@ class _TaskScreenState extends State<TaskScreen> {
       {"label": "Alarm", "icon": Icons.alarm_rounded},
       {"label": "Display", "icon": Icons.tv_rounded},
       {"label": "Settings", "icon": Icons.settings_rounded},
-      {"label": "Sign out", "icon": Icons.logout_rounded},
     ];
 
     return Container(
@@ -2634,67 +2633,36 @@ class _TaskScreenState extends State<TaskScreen> {
         runSpacing: 8,
         children: List.generate(tabs.length, (index) {
           final tab = tabs[index];
-          final tabLabel = tab["label"] as String;
           final tabIcon = tab["icon"] as IconData;
-          final isSignOutTab = tabLabel == "Sign out";
-          final selected = !isSignOutTab && selectedDashboardTab == index;
+          final selected = selectedDashboardTab == index;
 
-          final tabBackgroundColor = selected
-              ? const Color(0xFF0D9488)
-              : (isSignOutTab
-                  ? const Color(0xFFFEE2E2)
-                  : const Color(0xFFF3F4F6));
-          final tabTextColor = selected
-              ? Colors.white
-              : (isSignOutTab
-                  ? const Color(0xFFDC2626)
-                  : const Color(0xFF374151));
-          final tabIconColor = selected
-              ? Colors.white
-              : (isSignOutTab
-                  ? const Color(0xFFDC2626)
-                  : const Color(0xFF6B7280));
+              final tabBackgroundColor = selected
+                ? const Color(0xFF0D9488)
+                : const Color(0xFFF3F4F6);
+              final tabIconColor = selected
+                ? Colors.white
+                : const Color(0xFF6B7280);
 
           return Material(
             color: Colors.transparent,
             child: InkWell(
               borderRadius: BorderRadius.circular(14),
               onTap: () async {
-                if (isSignOutTab) {
-                  await confirmSignOut();
-                  return;
-                }
                 setState(() => selectedDashboardTab = index);
               },
               child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                width: 52,
+                height: 46,
                 decoration: BoxDecoration(
                   color: tabBackgroundColor,
                   borderRadius: BorderRadius.circular(14),
-                  border: selected
-                      ? Border.all(color: const Color(0xFF0D9488), width: 2)
-                      : Border.all(color: Colors.transparent),
                 ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      tabIcon,
-                      color: tabIconColor,
-                      size: 18,
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      tabLabel,
-                      style: TextStyle(
-                        color: tabTextColor,
-                        fontWeight:
-                            selected ? FontWeight.w700 : FontWeight.w600,
-                        fontSize: 13,
-                      ),
-                    ),
-                  ],
+                child: Center(
+                  child: Icon(
+                    tabIcon,
+                    color: tabIconColor,
+                    size: 20,
+                  ),
                 ),
               ),
             ),
@@ -3977,6 +3945,28 @@ class _TaskScreenState extends State<TaskScreen> {
                     child: Text(clockSyncStatus),
                   ),
                 const SizedBox(height: 14),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: confirmSignOut,
+                    icon: const Icon(Icons.logout_rounded, size: 18),
+                    label: const Text("Sign out"),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFFB91C1C),
+                      backgroundColor: const Color(0xFFFFF1F2),
+                      side: const BorderSide(color: Color(0xFFFCA5A5)),
+                      minimumSize: const Size.fromHeight(48),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      textStyle: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
