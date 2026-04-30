@@ -1,3 +1,5 @@
+import com.android.build.gradle.LibraryExtension
+
 allprojects {
     repositories {
         google()
@@ -17,6 +19,14 @@ subprojects {
 }
 subprojects {
     project.evaluationDependsOn(":app")
+
+    afterEvaluate {
+        if (name == "geofence_service") {
+            extensions.configure<LibraryExtension>("android") {
+                namespace = "com.pravera.geofence_service"
+            }
+        }
+    }
 }
 
 tasks.register<Delete>("clean") {
