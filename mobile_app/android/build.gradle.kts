@@ -19,9 +19,8 @@ subprojects {
 }
 subprojects {
     project.evaluationDependsOn(":app")
-
-    afterEvaluate {
-        if (name == "geofence_service") {
+    if (name == "geofence_service") {
+        plugins.withId("com.android.library") {
             extensions.configure<LibraryExtension>("android") {
                 namespace = "com.pravera.geofence_service"
             }
