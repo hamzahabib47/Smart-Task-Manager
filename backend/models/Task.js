@@ -20,12 +20,12 @@ const taskSchema = new mongoose.Schema(
     },
     date: {
       type: String,
-      required: true,
+      required: false,
       trim: true,
     },
     time: {
       type: String,
-      required: true,
+      required: false,
       trim: true,
     },
     completed: {
@@ -43,6 +43,33 @@ const taskSchema = new mongoose.Schema(
     reminderShownAt: {
       type: Date,
       default: null,
+    },
+    reminderNotifiedAt: {
+      type: Date,
+      default: null,
+    },
+    isLocationBased: {
+      type: Boolean,
+      default: false,
+    },
+    location: {
+      address: {
+        type: String,
+        default: "",
+        trim: true,
+      },
+      latitude: {
+        type: Number,
+        default: null,
+      },
+      longitude: {
+        type: Number,
+        default: null,
+      },
+      radiusMeters: {
+        type: Number,
+        default: null,
+      },
     },
   },
   {

@@ -2,12 +2,36 @@ import "dart:async";
 import "dart:convert";
 import "dart:math";
 
+import "package:firebase_core/firebase_core.dart";
+import "package:firebase_messaging/firebase_messaging.dart";
+import "package:flutter/foundation.dart";
 import "package:flutter/material.dart";
+import "package:geocoding/geocoding.dart";
 import "package:http/http.dart" as http;
 import "package:image_picker/image_picker.dart";
 import "package:shared_preferences/shared_preferences.dart";
 
-void main() {
+import "services/location_task_models.dart";
+import "services/location_task_service.dart";
+import "services/task_reminder_notifications.dart";
+
+@pragma("vm:entry-point")
+Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  if (Firebase.apps.isEmpty) {
+    await Firebase.initializeApp();
+  }
+}
+
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  if (!kIsWeb) {
+    await Firebase.initializeApp();
+    FirebaseMessaging.onBackgroundMessage(
+      _firebaseMessagingBackgroundHandler,
+    );
+  }
+
   runApp(const SmartTimeManagerApp());
 }
 
@@ -328,6 +352,9 @@ class Task {
   final String time;
   final bool completed;
   final bool archived;
+  final bool dismissed;
+  final bool isLocationBased;
+  final TaskLocation? location;
 
   Task({
     required this.id,
@@ -337,9 +364,13 @@ class Task {
     required this.time,
     required this.completed,
     required this.archived,
+    required this.dismissed,
+    required this.isLocationBased,
+    required this.location,
   });
 
   factory Task.fromJson(Map<String, dynamic> json) {
+    final location = json["location"] as Map<String, dynamic>?;
     return Task(
       id: json["_id"] ?? "",
       title: json["title"] ?? "",
@@ -348,8 +379,32 @@ class Task {
       time: json["time"] ?? "",
       completed: json["completed"] ?? false,
       archived: json["archived"] ?? false,
+      dismissed: json["dismissed"] ?? false,
+      isLocationBased: json["isLocationBased"] ?? false,
+      location: location == null
+          ? null
+          : TaskLocation(
+              address: (location["address"] ?? "").toString(),
+              latitude: (location["latitude"] ?? 0).toDouble(),
+              longitude: (location["longitude"] ?? 0).toDouble(),
+              radiusMeters: (location["radiusMeters"] ?? 0).toDouble(),
+            ),
     );
   }
+}
+
+class TaskLocation {
+  final String address;
+  final double latitude;
+  final double longitude;
+  final double radiusMeters;
+
+  TaskLocation({
+    required this.address,
+    required this.latitude,
+    required this.longitude,
+    required this.radiusMeters,
+  });
 }
 
 class PhotoItem {
@@ -962,6 +1017,8 @@ class _TaskScreenState extends State<TaskScreen> {
   final TextEditingController descriptionController = TextEditingController();
   final TextEditingController dateController = TextEditingController();
   final TextEditingController timeController = TextEditingController();
+  final TextEditingController locationAddressController =
+      TextEditingController();
   final TextEditingController slideshowIntervalController =
       TextEditingController();
   final TextEditingController dailySummaryTimeController =
@@ -982,6 +1039,7 @@ class _TaskScreenState extends State<TaskScreen> {
   bool isUploadingPhoto = false;
   bool isAddingTask = false;
   bool isAddingAlarm = false;
+  bool isLocationBasedTask = false;
   bool isDeletingAccount = false;
   bool isSyncingClock = false;
   bool slideshowEnabled = true;
@@ -994,6 +1052,7 @@ class _TaskScreenState extends State<TaskScreen> {
   String reminderStyle = "full_screen";
   String clockSyncStatus = "";
   int selectedDashboardTab = 0;
+  int locationRadiusMeters = 500;
   String headerTimeText = "--:--:--";
   String previewModeTitle = "Slideshow";
   String previewDescription = "No uploaded photos yet";
@@ -1013,6 +1072,16 @@ class _TaskScreenState extends State<TaskScreen> {
   String currentUserName = "";
   Timer? headerClockTimer;
   Timer? displayPollTimer;
+  String? lastReminderKey;
+  DateTime? lastReminderNotifiedAt;
+  final Map<String, DateTime> locationTriggerLog = {};
+  String? registeredPushToken;
+  StreamSubscription<RemoteMessage>? messageSubscription;
+  StreamSubscription<String>? tokenSubscription;
+
+  final TaskReminderNotifications reminderNotifications =
+      TaskReminderNotifications();
+  final LocationTaskService locationTaskService = LocationTaskService();
 
   final ImagePicker imagePicker = ImagePicker();
 
@@ -1036,10 +1105,73 @@ class _TaskScreenState extends State<TaskScreen> {
     syncHeaderClock();
     startHeaderClock();
     fetchDisplayPreview();
+    reminderNotifications.initialize();
+    locationTaskService.initialize();
+    _setupPushMessaging();
     displayPollTimer = Timer.periodic(
       const Duration(seconds: 20),
       (_) => fetchDisplayPreview(),
     );
+  }
+
+  Future<void> _setupPushMessaging() async {
+    if (kIsWeb) return;
+
+    final messaging = FirebaseMessaging.instance;
+    final settings = await messaging.requestPermission(
+      alert: true,
+      badge: true,
+      sound: true,
+    );
+
+    await messaging.setForegroundNotificationPresentationOptions(
+      alert: true,
+      badge: true,
+      sound: true,
+    );
+
+    if (settings.authorizationStatus == AuthorizationStatus.denied) {
+      return;
+    }
+
+    final token = await messaging.getToken();
+    if (token != null) {
+      await _registerPushToken(token);
+    }
+
+    tokenSubscription?.cancel();
+    tokenSubscription = messaging.onTokenRefresh.listen((newToken) {
+      _registerPushToken(newToken);
+    });
+
+    messageSubscription?.cancel();
+    messageSubscription = FirebaseMessaging.onMessage.listen((message) async {
+      final title = message.notification?.title ?? "Task reminder";
+      final body = message.notification?.body ?? "Task reminder active";
+      final payload = message.data["taskId"] ?? "";
+
+      await reminderNotifications.showReminder(
+        title: title,
+        body: body,
+        payload: payload,
+      );
+    });
+  }
+
+  Future<void> _registerPushToken(String token) async {
+    if (token.isEmpty) return;
+    if (registeredPushToken == token) return;
+    registeredPushToken = token;
+
+    try {
+      await http.post(
+        Uri.parse("${ApiConfig.baseUrl}/device/push-token"),
+        headers: authHeaders,
+        body: json.encode({"token": token}),
+      );
+    } catch (_) {
+      // Ignore network failures; we will retry on next token refresh.
+    }
   }
 
   String _clockText(DateTime dt) {
@@ -1214,6 +1346,124 @@ class _TaskScreenState extends State<TaskScreen> {
     return combined.isEmpty ? "--:--" : combined;
   }
 
+  Future<void> _maybeNotifyReminder(
+    Map<String, dynamic>? reminder,
+    String reminderTimeFormatted,
+  ) async {
+    if (!pushNotifications || reminder == null) return;
+
+    final id = (reminder["_id"] ?? reminder["id"] ?? "").toString().trim();
+    final title = (reminder["title"] ?? "Task reminder").toString().trim();
+    final description =
+        (reminder["description"] ?? "Task reminder active").toString().trim();
+    final date = (reminder["date"] ?? "").toString().trim();
+    final time = (reminder["time"] ?? "").toString().trim();
+
+    final keyParts = [id, date, time].where((part) => part.isNotEmpty).toList();
+    final key = keyParts.isEmpty
+        ? [title, date, time].where((part) => part.isNotEmpty).join("|")
+        : keyParts.join("|");
+
+    if (key.isEmpty) return;
+
+    final now = DateTime.now();
+    if (lastReminderKey == key &&
+        lastReminderNotifiedAt != null &&
+        now.difference(lastReminderNotifiedAt!).inSeconds < 60) {
+      return;
+    }
+
+    lastReminderKey = key;
+    lastReminderNotifiedAt = now;
+
+    final subtitle = reminderTimeFormatted.trim().isEmpty
+        ? title
+        : "$title at $reminderTimeFormatted";
+    final body = description.isEmpty ? "Task reminder active" : description;
+
+    await reminderNotifications.showReminder(
+      title: subtitle,
+      body: body,
+      payload: id.isEmpty ? key : id,
+    );
+  }
+
+  Future<TaskLocation?> _resolveLocationForTask() async {
+    final address = locationAddressController.text.trim();
+    if (address.isEmpty) {
+      showMessage("Please enter a location address");
+      return null;
+    }
+
+    try {
+      final results = await locationFromAddress(address);
+      if (results.isEmpty) {
+        showMessage("Could not find that location");
+        return null;
+      }
+
+      final place = results.first;
+      return TaskLocation(
+        address: address,
+        latitude: place.latitude,
+        longitude: place.longitude,
+        radiusMeters: locationRadiusMeters.toDouble(),
+      );
+    } catch (_) {
+      showMessage("Could not find that location");
+      return null;
+    }
+  }
+
+  Future<void> _refreshLocationReminders() async {
+    final reminders = tasks
+        .where(
+          (task) =>
+              task.isLocationBased &&
+              !task.completed &&
+              !task.archived &&
+              !task.dismissed &&
+              task.location != null,
+        )
+        .map(
+          (task) => LocationTaskReminder(
+            id: task.id,
+            title: task.title,
+            description: task.description,
+            latitude: task.location!.latitude,
+            longitude: task.location!.longitude,
+            radiusMeters: task.location!.radiusMeters,
+          ),
+        )
+        .toList();
+
+    await locationTaskService.updateGeofences(
+      reminders,
+      _handleLocationEnter,
+    );
+  }
+
+  Future<void> _handleLocationEnter(LocationTaskReminder reminder) async {
+    final lastFired = locationTriggerLog[reminder.id];
+    final now = DateTime.now();
+    if (lastFired != null && now.difference(lastFired).inMinutes < 10) {
+      return;
+    }
+
+    locationTriggerLog[reminder.id] = now;
+    final description = reminder.description.trim();
+    final body =
+        description.isEmpty ? "Location reminder active" : description;
+
+    await reminderNotifications.showReminder(
+      title: "Location reminder: ${reminder.title}",
+      body: body,
+      payload: reminder.id,
+    );
+
+    await _dismissTaskSilently(reminder.id);
+  }
+
   Future<void> fetchDisplayPreview() async {
     if (isFetchingDisplayPreview) return;
     isFetchingDisplayPreview = true;
@@ -1308,6 +1558,10 @@ class _TaskScreenState extends State<TaskScreen> {
         nextCountdownSeconds = (body["autoDismissRemainingSeconds"] ??
             body["autoDismissSeconds"] ??
             30) as int?;
+        await _maybeNotifyReminder(
+          reminder,
+          (body["reminderTimeFormatted"] ?? "").toString(),
+        );
       } else if (mode == "upcoming") {
         nextModeTitle = "Upcoming";
         final nextReminder = body["nextReminder"] as Map<String, dynamic>?;
@@ -1928,6 +2182,7 @@ class _TaskScreenState extends State<TaskScreen> {
         setState(() {
           tasks = data.map((item) => Task.fromJson(item)).toList();
         });
+        await _refreshLocationReminders();
       } else if (response.statusCode == 401) {
         widget.onLogout();
       } else {
@@ -1947,9 +2202,21 @@ class _TaskScreenState extends State<TaskScreen> {
     final description = descriptionController.text.trim();
     final date = dateController.text.trim();
     final time = timeController.text.trim();
+    final isLocationBased = isLocationBasedTask;
 
-    if (title.isEmpty || date.isEmpty || time.isEmpty) {
-      showMessage("Please fill title, date and time");
+    TaskLocation? resolvedLocation;
+    if (isLocationBased) {
+      resolvedLocation = await _resolveLocationForTask();
+      if (resolvedLocation == null) return;
+    }
+
+    if (title.isEmpty) {
+      showMessage("Please fill title");
+      return;
+    }
+
+    if (!isLocationBased && (date.isEmpty || time.isEmpty)) {
+      showMessage("Please fill date and time");
       return;
     }
 
@@ -1963,8 +2230,16 @@ class _TaskScreenState extends State<TaskScreen> {
         body: json.encode({
           "title": title,
           "description": description,
-          "date": date,
-          "time": time,
+          "date": isLocationBased ? "" : date,
+          "time": isLocationBased ? "" : time,
+          "isLocationBased": isLocationBased,
+          if (isLocationBased && resolvedLocation != null)
+            "location": {
+              "address": resolvedLocation.address,
+              "latitude": resolvedLocation.latitude,
+              "longitude": resolvedLocation.longitude,
+              "radiusMeters": resolvedLocation.radiusMeters,
+            },
         }),
       );
 
@@ -1973,6 +2248,7 @@ class _TaskScreenState extends State<TaskScreen> {
         descriptionController.clear();
         dateController.clear();
         timeController.clear();
+        locationAddressController.clear();
         await fetchTasks();
         await fetchDisplayPreview();
       } else if (response.statusCode == 401) {
@@ -2047,7 +2323,7 @@ class _TaskScreenState extends State<TaskScreen> {
     }
   }
 
-  Future<void> dismissTask(String taskId) async {
+  Future<void> dismissTask(String taskId, {bool silent = false}) async {
     try {
       final response = await http.patch(
         Uri.parse("${ApiConfig.baseUrl}/tasks/$taskId/dismiss"),
@@ -2059,11 +2335,19 @@ class _TaskScreenState extends State<TaskScreen> {
       } else if (response.statusCode == 401) {
         widget.onLogout();
       } else {
-        showMessage("Could not dismiss reminder");
+        if (!silent) {
+          showMessage("Could not dismiss reminder");
+        }
       }
     } catch (_) {
-      showMessage("Server error while dismissing reminder");
+      if (!silent) {
+        showMessage("Server error while dismissing reminder");
+      }
     }
+  }
+
+  Future<void> _dismissTaskSilently(String taskId) async {
+    await dismissTask(taskId, silent: true);
   }
 
   DateTime? _taskDateTime(Task task) {
@@ -2081,7 +2365,8 @@ class _TaskScreenState extends State<TaskScreen> {
     if (selectedView == "upcoming") {
       final now = DateTime.now();
       return tasks.where((task) {
-        if (task.completed || task.archived) return false;
+        if (task.completed || task.archived || task.dismissed) return false;
+        if (task.isLocationBased) return true;
         final scheduled = _taskDateTime(task);
         if (scheduled == null) return false;
         return scheduled.isAfter(now) || scheduled.isAtSameMomentAs(now);
@@ -2096,6 +2381,12 @@ class _TaskScreenState extends State<TaskScreen> {
     final editDescription = TextEditingController(text: task.description);
     final editDate = TextEditingController(text: task.date);
     final editTime = TextEditingController(text: task.time);
+    final editAddress = TextEditingController(
+      text: task.location?.address ?? "",
+    );
+    var editRadius =
+        task.location?.radiusMeters.toInt() ?? locationRadiusMeters;
+    final isLocationBased = task.isLocationBased;
 
     final saved = await showDialog<bool>(
       context: context,
@@ -2114,14 +2405,37 @@ class _TaskScreenState extends State<TaskScreen> {
                   controller: editDescription,
                   decoration: const InputDecoration(labelText: "Description"),
                 ),
-                TextField(
-                  controller: editDate,
-                  decoration: const InputDecoration(labelText: "Date"),
-                ),
-                TextField(
-                  controller: editTime,
-                  decoration: const InputDecoration(labelText: "Time"),
-                ),
+                if (!isLocationBased) ...[
+                  TextField(
+                    controller: editDate,
+                    decoration: const InputDecoration(labelText: "Date"),
+                  ),
+                  TextField(
+                    controller: editTime,
+                    decoration: const InputDecoration(labelText: "Time"),
+                  ),
+                ] else ...[
+                  TextField(
+                    controller: editAddress,
+                    decoration:
+                        const InputDecoration(labelText: "Location address"),
+                  ),
+                  const SizedBox(height: 8),
+                  DropdownButtonFormField<int>(
+                    initialValue: editRadius,
+                    decoration:
+                        const InputDecoration(labelText: "Radius (meters)"),
+                    items: const [
+                      DropdownMenuItem(value: 100, child: Text("100 m")),
+                      DropdownMenuItem(value: 200, child: Text("200 m")),
+                      DropdownMenuItem(value: 500, child: Text("500 m")),
+                    ],
+                    onChanged: (value) {
+                      if (value == null) return;
+                      editRadius = value;
+                    },
+                  ),
+                ]
               ],
             ),
           ),
@@ -2141,6 +2455,34 @@ class _TaskScreenState extends State<TaskScreen> {
 
     if (saved != true) return;
 
+    TaskLocation? resolvedLocation;
+    if (isLocationBased) {
+      final address = editAddress.text.trim();
+      if (address.isEmpty) {
+        showMessage("Please enter a location address");
+        return;
+      }
+
+      try {
+        final results = await locationFromAddress(address);
+        if (results.isEmpty) {
+          showMessage("Could not find that location");
+          return;
+        }
+
+        final place = results.first;
+        resolvedLocation = TaskLocation(
+          address: address,
+          latitude: place.latitude,
+          longitude: place.longitude,
+          radiusMeters: editRadius.toDouble(),
+        );
+      } catch (_) {
+        showMessage("Could not find that location");
+        return;
+      }
+    }
+
     try {
       final response = await http.put(
         Uri.parse("${ApiConfig.baseUrl}/tasks/${task.id}"),
@@ -2148,8 +2490,16 @@ class _TaskScreenState extends State<TaskScreen> {
         body: json.encode({
           "title": editTitle.text.trim(),
           "description": editDescription.text.trim(),
-          "date": editDate.text.trim(),
-          "time": editTime.text.trim(),
+          "date": isLocationBased ? "" : editDate.text.trim(),
+          "time": isLocationBased ? "" : editTime.text.trim(),
+          "isLocationBased": isLocationBased,
+          if (isLocationBased && resolvedLocation != null)
+            "location": {
+              "address": resolvedLocation.address,
+              "latitude": resolvedLocation.latitude,
+              "longitude": resolvedLocation.longitude,
+              "radiusMeters": resolvedLocation.radiusMeters,
+            },
         }),
       );
 
@@ -2167,6 +2517,7 @@ class _TaskScreenState extends State<TaskScreen> {
       editDescription.dispose();
       editDate.dispose();
       editTime.dispose();
+      editAddress.dispose();
     }
   }
 
@@ -2894,33 +3245,80 @@ class _TaskScreenState extends State<TaskScreen> {
                   ),
                 ),
                 const SizedBox(height: 10),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: dateController,
-                        readOnly: true,
-                        onTap: pickTaskDate,
-                        decoration: const InputDecoration(
-                          labelText: "Date",
-                          prefixIcon: Icon(Icons.calendar_today),
-                        ),
-                      ),
+                DropdownButtonFormField<String>(
+                  initialValue:
+                      isLocationBasedTask ? "location" : "time",
+                  decoration: const InputDecoration(
+                    labelText: "Task type",
+                  ),
+                  items: const [
+                    DropdownMenuItem(
+                      value: "time",
+                      child: Text("Time-based"),
                     ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: TextField(
-                        controller: timeController,
-                        readOnly: true,
-                        onTap: pickTaskTime,
-                        decoration: const InputDecoration(
-                          labelText: "Time",
-                          prefixIcon: Icon(Icons.access_time),
-                        ),
-                      ),
+                    DropdownMenuItem(
+                      value: "location",
+                      child: Text("Location-based"),
                     ),
                   ],
+                  onChanged: (value) {
+                    if (value == null) return;
+                    setState(() => isLocationBasedTask = value == "location");
+                  },
                 ),
+                const SizedBox(height: 10),
+                if (!isLocationBasedTask)
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: dateController,
+                          readOnly: true,
+                          onTap: pickTaskDate,
+                          decoration: const InputDecoration(
+                            labelText: "Date",
+                            prefixIcon: Icon(Icons.calendar_today),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: TextField(
+                          controller: timeController,
+                          readOnly: true,
+                          onTap: pickTaskTime,
+                          decoration: const InputDecoration(
+                            labelText: "Time",
+                            prefixIcon: Icon(Icons.access_time),
+                          ),
+                        ),
+                      ),
+                    ],
+                  )
+                else ...[
+                  TextField(
+                    controller: locationAddressController,
+                    decoration: const InputDecoration(
+                      labelText: "Location address",
+                      prefixIcon: Icon(Icons.place_outlined),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  DropdownButtonFormField<int>(
+                    initialValue: locationRadiusMeters,
+                    decoration:
+                        const InputDecoration(labelText: "Radius (meters)"),
+                    items: const [
+                      DropdownMenuItem(value: 100, child: Text("100 m")),
+                      DropdownMenuItem(value: 200, child: Text("200 m")),
+                      DropdownMenuItem(value: 500, child: Text("500 m")),
+                    ],
+                    onChanged: (value) {
+                      if (value == null) return;
+                      setState(() => locationRadiusMeters = value);
+                    },
+                  ),
+                ],
                 const SizedBox(height: 12),
                 SizedBox(
                   width: double.infinity,
@@ -2994,7 +3392,11 @@ class _TaskScreenState extends State<TaskScreen> {
                         : Column(
                             children: visibleTasks.map((task) {
                               final timeLine =
-                                  "${task.date} ${formatTimeByPreference(task.time)}";
+                                  task.isLocationBased
+                                    ? (task.location?.address.trim().isNotEmpty == true
+                                      ? task.location!.address
+                                      : "Location-based task")
+                                    : "${task.date} ${formatTimeByPreference(task.time)}";
                               final description = task.description.trim();
                               final subtitleText = description.isEmpty
                                   ? timeLine
@@ -3087,6 +3489,19 @@ class _TaskScreenState extends State<TaskScreen> {
                                               fontWeight: FontWeight.w600,
                                             ),
                                           ),
+                                          if (task.isLocationBased) ...[
+                                            const SizedBox(width: 6),
+                                            Chip(
+                                              label: const Text("Location"),
+                                              backgroundColor:
+                                                  const Color(0xFF2563EB)
+                                                      .withValues(alpha: 0.12),
+                                              labelStyle: const TextStyle(
+                                                color: Color(0xFF2563EB),
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                            ),
+                                          ],
                                         ],
                                       ),
                                       const SizedBox(height: 16),
@@ -3636,10 +4051,13 @@ class _TaskScreenState extends State<TaskScreen> {
   void dispose() {
     headerClockTimer?.cancel();
     displayPollTimer?.cancel();
+    messageSubscription?.cancel();
+    tokenSubscription?.cancel();
     titleController.dispose();
     descriptionController.dispose();
     dateController.dispose();
     timeController.dispose();
+    locationAddressController.dispose();
     slideshowIntervalController.dispose();
     dailySummaryTimeController.dispose();
     alarmLabelController.dispose();
@@ -3647,6 +4065,7 @@ class _TaskScreenState extends State<TaskScreen> {
     alarmTimeController.dispose();
     deleteAccountConfirmController.dispose();
     changeNameController.dispose();
+    locationTaskService.dispose();
     super.dispose();
   }
 

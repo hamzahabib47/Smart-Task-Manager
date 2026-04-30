@@ -40,12 +40,12 @@ Server runs on `http://localhost:5000`
 
 **POST `/api/tasks`**
 - Headers: `Authorization: Bearer <token>`
-- Body: `{ title, description, dueDate, dueTime, isOneTime, reminderInterval }`
+- Body: `{ title, description, dueDate, dueTime, isLocationBased, location }`
 - Response: `{ id, ... }`
 
 **PUT `/api/tasks/:id`**
 - Headers: `Authorization: Bearer <token>`
-- Body: `{ title, description, dueDate, dueTime, isCompleted, isArchived, reminderInterval }`
+- Body: `{ title, description, dueDate, dueTime, isLocationBased, location }`
 - Response: `{ id, ... }`
 
 **DELETE `/api/tasks/:id`**
@@ -55,6 +55,7 @@ Server runs on `http://localhost:5000`
 **GET `/api/tasks/public/display-state`**
 - Public endpoint (no auth required)
 - Response: `{ mode, upcomingTask, reminder, alarm, photos, displayState, ... }`
+- Notes: Location-based tasks are excluded from display-state responses.
 
 ### Alarms
 
@@ -108,6 +109,21 @@ Server runs on `http://localhost:5000`
 
 **GET `/api/device/status`**
 - Response: `{ status: "ok" }`
+
+**POST `/api/device/push-token`**
+- Headers: `Authorization: Bearer <token>`
+- Body: `{ token }`
+- Response: `{ success: true }`
+
+**DELETE `/api/device/push-token`**
+- Headers: `Authorization: Bearer <token>`
+- Body: `{ token }`
+- Response: `{ success: true }`
+
+**Push Notifications**
+- Set one of: `FIREBASE_SERVICE_ACCOUNT_JSON`,
+  `FIREBASE_SERVICE_ACCOUNT_BASE64`, or `FIREBASE_SERVICE_ACCOUNT_PATH`
+  for Firebase Admin SDK credentials.
 
 **WebSocket / SSE Events**
 - `tasksUpdated`: Task list changed (created/updated/deleted)

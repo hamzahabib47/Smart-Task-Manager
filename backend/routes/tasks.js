@@ -3,8 +3,10 @@ const Alarm = require("../models/Alarm");
 const Photo = require("../models/Photo");
 const Setting = require("../models/Setting");
 const Task = require("../models/Task");
+const User = require("../models/User");
 const authMiddleware = require("../middleware/auth");
 const { broadcastUpdate } = require("../services/realtime");
+const { sendReminderPush } = require("../services/pushNotifications");
 const {
   getDisplayStateCache,
   setDisplayStateCache,
@@ -81,6 +83,45 @@ const formatByPreference = (timeText, timeFormat) => {
   return toTwelveHour(timeText);
 };
 
+const parseLocationPayload = (body = {}) => {
+  const isLocationBased =
+    body.isLocationBased === true || body.isLocationBased === "true";
+
+  if (!isLocationBased) {
+    return { isLocationBased: false, location: null, errors: [] };
+  }
+
+  const address =
+    (body.location?.address || body.locationAddress || body.address || "")
+      .toString()
+      .trim();
+  const latitude = Number(body.location?.latitude ?? body.latitude);
+  const longitude = Number(body.location?.longitude ?? body.longitude);
+  const radiusMeters = Number(
+    body.location?.radiusMeters ?? body.radiusMeters ?? body.radius
+  );
+
+  const errors = [];
+  if (!address) errors.push("location address is required");
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+    errors.push("location coordinates are required");
+  }
+  if (!Number.isFinite(radiusMeters) || radiusMeters <= 0) {
+    errors.push("location radiusMeters is required");
+  }
+
+  return {
+    isLocationBased: true,
+    location: {
+      address,
+      latitude,
+      longitude,
+      radiusMeters,
+    },
+    errors,
+  };
+};
+
 const shouldTriggerAlarmNow = (alarm, nowUtc, timezoneOffsetMinutes, todayText) => {
   const scheduledToday = parseTaskDateTime(
     todayText,
@@ -151,6 +192,7 @@ router.get("/tasks/public/display-state", async (_req, res) => {
     const tasksQuery = {
       archived: false,
       completed: false,
+      isLocationBased: { $ne: true },
       ...(dataScope || {}),
     };
 
@@ -276,15 +318,62 @@ router.get("/tasks/public/display-state", async (_req, res) => {
     });
 
     if (pushNotifications && dueNowTask) {
+      let shouldSave = false;
+
       if (!dueNowTask.reminderShownAt) {
         dueNowTask.reminderShownAt = now;
-        await dueNowTask.save();
+        shouldSave = true;
       }
 
       const shownAt = dueNowTask.reminderShownAt
         ? new Date(dueNowTask.reminderShownAt)
         : now;
       const elapsedMs = now.getTime() - shownAt.getTime();
+
+      const lastNotifiedAt = dueNowTask.reminderNotifiedAt
+        ? new Date(dueNowTask.reminderNotifiedAt)
+        : null;
+      const recentlyNotified =
+        lastNotifiedAt && now.getTime() - lastNotifiedAt.getTime() < 60000;
+
+      if (!recentlyNotified) {
+        const user = await User.findById(displayUserId).select("fcmTokens");
+        const tokens = user?.fcmTokens || [];
+
+        if (tokens.length > 0) {
+          const timeText = formatByPreference(dueNowTask.time, timeFormat);
+          const description = (dueNowTask.description || "").trim();
+          const body = description
+            ? `${dueNowTask.title} \u2022 ${description}`
+            : `${dueNowTask.title} at ${timeText}`;
+
+          const result = await sendReminderPush({
+            tokens,
+            title: "Task reminder",
+            body,
+            data: {
+              type: "reminder",
+              taskId: String(dueNowTask._id),
+              time: timeText,
+            },
+          });
+
+          if (result.invalidTokens.length > 0) {
+            await User.findByIdAndUpdate(displayUserId, {
+              $pull: { fcmTokens: { $in: result.invalidTokens } },
+            });
+          }
+
+          if (result.successCount + result.failureCount > 0) {
+            dueNowTask.reminderNotifiedAt = now;
+            shouldSave = true;
+          }
+        }
+      }
+
+      if (shouldSave) {
+        await dueNowTask.save();
+      }
 
       if (elapsedMs >= reminderAutoDismissSeconds * 1000) {
         dueNowTask.dismissed = true;
@@ -429,12 +518,27 @@ router.use(authMiddleware);
 
 router.post("/tasks", async (req, res) => {
   try {
-    const { title, description = "", date, time } = req.body;
+    const { title, description = "", date = "", time = "" } = req.body;
+    const locationPayload = parseLocationPayload(req.body);
 
-    if (!title || !date || !time) {
+    if (locationPayload.errors.length > 0) {
       return res.status(400).json({
         success: false,
-        message: "title, date and time are required",
+        message: locationPayload.errors[0],
+      });
+    }
+
+    if (!title) {
+      return res.status(400).json({
+        success: false,
+        message: "title is required",
+      });
+    }
+
+    if (!locationPayload.isLocationBased && (!date || !time)) {
+      return res.status(400).json({
+        success: false,
+        message: "date and time are required",
       });
     }
 
@@ -442,8 +546,10 @@ router.post("/tasks", async (req, res) => {
       user: req.user.id,
       title,
       description,
-      date,
-      time,
+      date: locationPayload.isLocationBased ? "" : date,
+      time: locationPayload.isLocationBased ? "" : time,
+      isLocationBased: locationPayload.isLocationBased,
+      location: locationPayload.isLocationBased ? locationPayload.location : null,
     });
 
     // Emit real-time update event
@@ -487,18 +593,42 @@ router.get("/tasks", async (req, res) => {
 
 router.put("/tasks/:id", async (req, res) => {
   try {
-    const { title, description = "", date, time } = req.body;
+    const { title, description = "", date = "", time = "" } = req.body;
+    const locationPayload = parseLocationPayload(req.body);
 
-    if (!title || !date || !time) {
+    if (locationPayload.errors.length > 0) {
       return res.status(400).json({
         success: false,
-        message: "title, date and time are required",
+        message: locationPayload.errors[0],
+      });
+    }
+
+    if (!title) {
+      return res.status(400).json({
+        success: false,
+        message: "title is required",
+      });
+    }
+
+    if (!locationPayload.isLocationBased && (!date || !time)) {
+      return res.status(400).json({
+        success: false,
+        message: "date and time are required",
       });
     }
 
     const task = await Task.findOneAndUpdate(
       { _id: req.params.id, user: req.user.id },
-      { title, description, date, time },
+      {
+        title,
+        description,
+        date: locationPayload.isLocationBased ? "" : date,
+        time: locationPayload.isLocationBased ? "" : time,
+        isLocationBased: locationPayload.isLocationBased,
+        location: locationPayload.isLocationBased
+          ? locationPayload.location
+          : null,
+      },
       { new: true }
     );
 

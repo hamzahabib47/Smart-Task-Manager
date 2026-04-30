@@ -2,8 +2,69 @@ const express = require("express");
 
 const authMiddleware = require("../middleware/auth");
 const Setting = require("../models/Setting");
+const User = require("../models/User");
 
 const router = express.Router();
+
+router.post("/device/push-token", authMiddleware, async (req, res) => {
+  const token = (req.body.token || "").trim();
+
+  if (!token) {
+    return res.status(400).json({
+      success: false,
+      message: "token is required",
+    });
+  }
+
+  const user = await User.findByIdAndUpdate(
+    req.user.id,
+    { $addToSet: { fcmTokens: token } },
+    { new: true }
+  );
+
+  if (!user) {
+    return res.status(404).json({
+      success: false,
+      message: "User not found",
+    });
+  }
+
+  return res.json({
+    success: true,
+    message: "Push token registered",
+    data: { token },
+  });
+});
+
+router.delete("/device/push-token", authMiddleware, async (req, res) => {
+  const token = (req.body.token || "").trim();
+
+  if (!token) {
+    return res.status(400).json({
+      success: false,
+      message: "token is required",
+    });
+  }
+
+  const user = await User.findByIdAndUpdate(
+    req.user.id,
+    { $pull: { fcmTokens: token } },
+    { new: true }
+  );
+
+  if (!user) {
+    return res.status(404).json({
+      success: false,
+      message: "User not found",
+    });
+  }
+
+  return res.json({
+    success: true,
+    message: "Push token removed",
+    data: { token },
+  });
+});
 
 router.post("/device/clock-sync", authMiddleware, async (req, res) => {
   const now = new Date();
