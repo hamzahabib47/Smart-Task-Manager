@@ -17,8 +17,24 @@ import "services/task_reminder_notifications.dart";
 
 @pragma("vm:entry-point")
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  if (Firebase.apps.isEmpty) {
+  if (Firebase.apps.isNotEmpty) return;
+  try {
     await Firebase.initializeApp();
+  } catch (error, stackTrace) {
+    debugPrint("Firebase init failed in background: $error");
+    debugPrintStack(stackTrace: stackTrace);
+  }
+}
+
+Future<bool> _tryInitializeFirebase() async {
+  if (Firebase.apps.isNotEmpty) return true;
+  try {
+    await Firebase.initializeApp();
+    return true;
+  } catch (error, stackTrace) {
+    debugPrint("Firebase init failed: $error");
+    debugPrintStack(stackTrace: stackTrace);
+    return false;
   }
 }
 
@@ -26,10 +42,12 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   if (!kIsWeb) {
-    await Firebase.initializeApp();
-    FirebaseMessaging.onBackgroundMessage(
-      _firebaseMessagingBackgroundHandler,
-    );
+    final firebaseReady = await _tryInitializeFirebase();
+    if (firebaseReady) {
+      FirebaseMessaging.onBackgroundMessage(
+        _firebaseMessagingBackgroundHandler,
+      );
+    }
   }
 
   runApp(const SmartTimeManagerApp());
