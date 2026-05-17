@@ -441,6 +441,14 @@ class PhotoItem {
       url: json["url"] ?? "",
     );
   }
+
+  Map<String, dynamic> toJson() {
+    return {
+      "_id": id,
+      "filename": filename,
+      "url": url,
+    };
+  }
 }
 
 class AlarmItem {
@@ -1033,6 +1041,10 @@ class TaskScreen extends StatefulWidget {
 }
 
 class _TaskScreenState extends State<TaskScreen> {
+  static const String _cachedPhotosKey = "cached_photos";
+  static const String _cachedSelectedPhotoIdKey = "cached_selected_photo_id";
+  static const String _cachedDisplayPreviewKey = "cached_display_preview";
+
   final TextEditingController titleController = TextEditingController();
   final TextEditingController descriptionController = TextEditingController();
   final TextEditingController dateController = TextEditingController();
@@ -1125,6 +1137,8 @@ class _TaskScreenState extends State<TaskScreen> {
     super.initState();
     currentUserName = widget.signedInName.trim();
     changeNameController.text = currentUserName;
+    unawaited(_restoreCachedPhotos());
+    unawaited(_restoreCachedDisplayPreview());
     fetchTasks();
     fetchSettings();
     fetchPhotos();
@@ -1369,6 +1383,139 @@ class _TaskScreenState extends State<TaskScreen> {
       final trimmed = url.trim();
       if (trimmed.isEmpty) continue;
       unawaited(photoCacheManager.downloadFile(trimmed));
+    }
+  }
+
+  Future<void> _restoreCachedPhotos() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_cachedPhotosKey);
+      if (raw == null || raw.trim().isEmpty) return;
+
+      final data = json.decode(raw) as List<dynamic>;
+      final items = data
+          .whereType<Map<String, dynamic>>()
+          .map(PhotoItem.fromJson)
+          .toList();
+      if (items.isEmpty || !mounted) return;
+
+      final cachedSelected =
+          prefs.getString(_cachedSelectedPhotoIdKey) ?? "";
+      final hasSelected = items.any((item) => item.id == cachedSelected);
+      final nextSelected = hasSelected
+          ? cachedSelected
+          : (items.isNotEmpty ? items.first.id : "");
+
+      setState(() {
+        photos = items;
+        selectedSinglePhotoId = nextSelected;
+      });
+
+      _warmPhotoCache(items.map((item) => toDisplayImageUrl(item.url)));
+    } catch (_) {
+      // Ignore cache restore failures.
+    }
+  }
+
+  Future<void> _persistCachedPhotos(
+    List<PhotoItem> items,
+    String selectedId,
+  ) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(
+        _cachedPhotosKey,
+        json.encode(items.map((item) => item.toJson()).toList()),
+      );
+      await prefs.setString(_cachedSelectedPhotoIdKey, selectedId);
+    } catch (_) {
+      // Ignore cache write failures.
+    }
+  }
+
+  Future<void> _restoreCachedDisplayPreview() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_cachedDisplayPreviewKey);
+      if (raw == null || raw.trim().isEmpty) return;
+
+      final data = json.decode(raw) as Map<String, dynamic>;
+      if (!mounted) return;
+
+      setState(() {
+        previewModeTitle = (data["previewModeTitle"] ?? previewModeTitle)
+            .toString();
+        previewDescription =
+            (data["previewDescription"] ?? previewDescription).toString();
+        previewImageUrl = (data["previewImageUrl"] ?? "").toString();
+        previewTimeText = _clockText(DateTime.now());
+        previewPrimaryText =
+            (data["previewPrimaryText"] ?? previewPrimaryText).toString();
+        previewSecondaryText =
+            (data["previewSecondaryText"] ?? "").toString();
+        previewMetaTop = (data["previewMetaTop"] ?? previewMetaTop).toString();
+        previewMetaBottom =
+            (data["previewMetaBottom"] ?? previewMetaBottom).toString();
+        previewShowMeta = data["previewShowMeta"] == true;
+        previewShowBanner = data["previewShowBanner"] == true;
+        previewBannerTitle =
+            (data["previewBannerTitle"] ?? previewBannerTitle).toString();
+        previewBannerSubtitle =
+            (data["previewBannerSubtitle"] ?? previewBannerSubtitle)
+                .toString();
+        previewShowEmptyDisplayMessage =
+            data["previewShowEmptyDisplayMessage"] == true;
+        final countdownRaw = data["previewCountdownSeconds"];
+        previewCountdownSeconds = countdownRaw is int
+            ? countdownRaw
+            : int.tryParse((countdownRaw ?? "").toString());
+      });
+
+      if (previewImageUrl.isNotEmpty) {
+        _warmPhotoCache([previewImageUrl]);
+      }
+    } catch (_) {
+      // Ignore cache restore failures.
+    }
+  }
+
+  Future<void> _persistCachedDisplayPreview({
+    required String modeTitle,
+    required String description,
+    required String imageUrl,
+    required String primaryText,
+    required String secondaryText,
+    required String metaTop,
+    required String metaBottom,
+    required bool showMeta,
+    required bool showBanner,
+    required String bannerTitle,
+    required String bannerSubtitle,
+    required bool showEmptyMessage,
+    required int? countdownSeconds,
+  }) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(
+        _cachedDisplayPreviewKey,
+        json.encode({
+          "previewModeTitle": modeTitle,
+          "previewDescription": description,
+          "previewImageUrl": imageUrl,
+          "previewPrimaryText": primaryText,
+          "previewSecondaryText": secondaryText,
+          "previewMetaTop": metaTop,
+          "previewMetaBottom": metaBottom,
+          "previewShowMeta": showMeta,
+          "previewShowBanner": showBanner,
+          "previewBannerTitle": bannerTitle,
+          "previewBannerSubtitle": bannerSubtitle,
+          "previewShowEmptyDisplayMessage": showEmptyMessage,
+          "previewCountdownSeconds": countdownSeconds,
+        }),
+      );
+    } catch (_) {
+      // Ignore cache write failures.
     }
   }
 
@@ -1629,6 +1776,24 @@ class _TaskScreenState extends State<TaskScreen> {
           unawaited(precacheImage(provider, context));
         }
       }
+
+      unawaited(
+        _persistCachedDisplayPreview(
+          modeTitle: nextModeTitle,
+          description: nextDescription,
+          imageUrl: nextImage,
+          primaryText: nextPrimary,
+          secondaryText: nextSecondary,
+          metaTop: nextMetaTop,
+          metaBottom: nextMetaBottom,
+          showMeta: nextShowMeta,
+          showBanner: nextShowBanner,
+          bannerTitle: nextBannerTitle,
+          bannerSubtitle: nextBannerSubtitle,
+          showEmptyMessage: nextShowEmptyDisplayMessage,
+          countdownSeconds: nextCountdownSeconds,
+        ),
+      );
 
       setState(() {
         previewModeTitle = nextModeTitle;
@@ -2105,6 +2270,8 @@ class _TaskScreenState extends State<TaskScreen> {
           photos = photoItems;
           selectedSinglePhotoId = nextSelected;
         });
+
+        unawaited(_persistCachedPhotos(photoItems, nextSelected));
       } else if (response.statusCode == 401) {
         widget.onLogout();
       } else {
