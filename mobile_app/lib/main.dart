@@ -6,6 +6,8 @@ import "package:firebase_core/firebase_core.dart";
 import "package:firebase_messaging/firebase_messaging.dart";
 import "package:flutter/foundation.dart";
 import "package:flutter/material.dart";
+import "package:cached_network_image/cached_network_image.dart";
+import "package:flutter_cache_manager/flutter_cache_manager.dart";
 import "package:geocoding/geocoding.dart";
 import "package:http/http.dart" as http;
 import "package:image_picker/image_picker.dart";
@@ -1102,6 +1104,13 @@ class _TaskScreenState extends State<TaskScreen> {
   final LocationTaskService locationTaskService = LocationTaskService();
 
   final ImagePicker imagePicker = ImagePicker();
+  final CacheManager photoCacheManager = CacheManager(
+    Config(
+      "photoCache",
+      stalePeriod: const Duration(days: 30),
+      maxNrOfCacheObjects: 250,
+    ),
+  );
 
   bool get canDeleteAccount =>
       deleteAccountConfirmController.text.trim() == "DELETE MY ACCOUNT";
@@ -1355,6 +1364,14 @@ class _TaskScreenState extends State<TaskScreen> {
     return "${ApiConfig.baseUrl.replaceFirst('/api', '')}$url";
   }
 
+  void _warmPhotoCache(Iterable<String> urls) {
+    for (final url in urls) {
+      final trimmed = url.trim();
+      if (trimmed.isEmpty) continue;
+      unawaited(photoCacheManager.downloadFile(trimmed));
+    }
+  }
+
   String _formatPreviewDateTime(Map<String, dynamic>? task, String preferred) {
     final date = (task?["date"] ?? "").toString().trim();
     final time = preferred.trim().isNotEmpty
@@ -1600,6 +1617,17 @@ class _TaskScreenState extends State<TaskScreen> {
       } else {
         nextImage = firstPhoto;
         nextShowEmptyDisplayMessage = firstPhoto.isEmpty;
+      }
+
+      if (nextImage.isNotEmpty) {
+        _warmPhotoCache([nextImage]);
+        if (mounted) {
+          final provider = CachedNetworkImageProvider(
+            nextImage,
+            cacheManager: photoCacheManager,
+          );
+          unawaited(precacheImage(provider, context));
+        }
       }
 
       setState(() {
@@ -2060,6 +2088,10 @@ class _TaskScreenState extends State<TaskScreen> {
         final List<dynamic> data = body["data"] ?? [];
         final photoItems =
             data.map((item) => PhotoItem.fromJson(item)).toList();
+
+        _warmPhotoCache(
+          photoItems.map((item) => toDisplayImageUrl(item.url)),
+        );
 
         final hasSelected = photoItems.any(
           (item) => item.id == selectedSinglePhotoId,
@@ -2796,12 +2828,16 @@ class _TaskScreenState extends State<TaskScreen> {
                           ),
                           clipBehavior: Clip.antiAlias,
                           child: hasImage
-                              ? Image.network(
-                                  previewImageUrl,
+                              ? CachedNetworkImage(
+                                  imageUrl: previewImageUrl,
+                                  cacheManager: photoCacheManager,
                                   width: double.infinity,
                                   height: double.infinity,
                                   fit: BoxFit.contain,
-                                  errorBuilder: (_, __, ___) {
+                                  placeholder: (_, __) {
+                                    return const SizedBox.expand();
+                                  },
+                                  errorWidget: (_, __, ___) {
                                     return const SizedBox.shrink();
                                   },
                                 )
@@ -3144,9 +3180,7 @@ class _TaskScreenState extends State<TaskScreen> {
                           itemCount: photos.length,
                           itemBuilder: (context, index) {
                             final photo = photos[index];
-                            final imageUrl = photo.url.startsWith("http")
-                                ? photo.url
-                                : "${ApiConfig.baseUrl.replaceFirst('/api', '')}${photo.url}";
+                            final imageUrl = toDisplayImageUrl(photo.url);
 
                             return Container(
                               width: 190,
@@ -3160,11 +3194,20 @@ class _TaskScreenState extends State<TaskScreen> {
                                             const BorderRadius.vertical(
                                           top: Radius.circular(4),
                                         ),
-                                        child: Image.network(
-                                          imageUrl,
+                                        child: CachedNetworkImage(
+                                          imageUrl: imageUrl,
+                                          cacheManager: photoCacheManager,
                                           width: double.infinity,
                                           fit: BoxFit.cover,
-                                          errorBuilder: (_, __, ___) {
+                                          placeholder: (_, __) {
+                                            return const Center(
+                                              child:
+                                                  CircularProgressIndicator(
+                                                strokeWidth: 2,
+                                              ),
+                                            );
+                                          },
+                                          errorWidget: (_, __, ___) {
                                             return const Center(
                                               child:
                                                   Text("Preview unavailable"),
